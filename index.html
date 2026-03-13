@@ -185,7 +185,6 @@
 
     function initVoices() {
         const voices = synth.getVoices();
-        // Пытаемся найти женский русский голос или любой женский
         femaleVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('female') || v.name.includes('Google') || v.name.includes('Irina'))) 
                      || voices.find(v => v.name.includes('female')) || voices[0];
     }
@@ -197,12 +196,12 @@
         if (synth.speaking) synth.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         utter.voice = femaleVoice;
-        utter.pitch = 0.8; // Чуть более кибернетический тон
+        utter.pitch = 0.8;
         utter.rate = 1.1;
         synth.speak(utter);
     }
 
-    // --- ЗВУКОВОЙ ДВИЖОК (ЭФФЕКТЫ) ---
+    // --- ЗВУКОВОЙ ДВИЖОК ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -263,12 +262,12 @@
         speak(weapons[currentWpn].voice);
     }
 
-    let craters = { type: 'FeatureCollection', features: [] };
     const canvas = document.getElementById('canvas-fx');
     const ctx = canvas.getContext('2d');
     const body = document.getElementById('main-body');
     let particles = [];
     let styleIndex = 0;
+    let lockedBuildingId = null;
 
     const styles = [
         { name: 'Темный режим', url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' },
@@ -288,13 +287,6 @@
         speak("Смена режима наблюдения. " + styles[styleIndex].name);
         setTimeout(() => body.classList.remove('predator-glitch'), 400);
     }
-
-    map.on('style.load', () => {
-        if (!map.getSource('craters-src')) {
-            map.addSource('craters-src', { type: 'geojson', data: craters });
-            map.addLayer({ id: 'craters-layer', type: 'fill', source: 'craters-src', paint: { 'fill-color': '#000', 'fill-outline-color': '#fff', 'fill-opacity': 0.6 } });
-        }
-    });
 
     class Particle {
         constructor(x, y, color, zoomScale, isKinetic = false) {
@@ -358,17 +350,6 @@
     function executeImpact(pos, wpn, geo, zoom, zScale) {
         playSound('boom');
         for(let i=0; i<40; i++) particles.push(new Particle(pos.x, pos.y, wpn.color, zScale, wpn.id === 'kinetic'));
-        
-        const radius = (wpn.id === 'kinetic' ? 0.08 : 0.03) * (1 / Math.pow(2, zoom - 15)); 
-        const coords = [];
-        for (let i = 0; i < 16; i++) {
-            const angle = (i / 16) * Math.PI * 2;
-            coords.push([ geo.lng + (radius / Math.cos(geo.lat * Math.PI/180)) * Math.cos(angle), geo.lat + radius * Math.sin(angle) ]);
-        }
-        coords.push(coords[0]);
-        craters.features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } });
-        map.getSource('craters-src').setData(craters);
-
         body.style.filter = `brightness(2) contrast(2) saturate(0)`;
         setTimeout(() => body.style.filter = "none", 150);
     }
@@ -377,16 +358,22 @@
         document.getElementById('alt-val').innerText = (340 + Math.random()).toFixed(2) + " KM";
     }, 1000);
 
-    map.on('move', () => {
-        const c = map.getCenter();
-        document.getElementById('coords').innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
-        
+    // Функция обновления подсветки зданий
+    function updateBuildingHighlight() {
         const features = map.queryRenderedFeatures([window.innerWidth/2, window.innerHeight/2]);
-        const isBuilding = features.some(f => f.layer.id.includes('building') || f.layer.type === 'fill-extrusion');
-        
+        const building = features.find(f => f.layer.id.includes('building') || f.layer.type === 'fill-extrusion');
         const ch = document.getElementById('ch-ui');
-        if (isBuilding) {
-            if (!ch.classList.contains('locked')) {
+
+        if (building) {
+            if (lockedBuildingId !== building.id) {
+                // Снимаем старый захват
+                if (lockedBuildingId !== null) {
+                    map.setFeatureState({ source: building.source, sourceLayer: building.sourceLayer, id: lockedBuildingId }, { locked: false });
+                }
+                lockedBuildingId = building.id;
+                // Активируем новый захват в состоянии карты (если стиль поддерживает state)
+                map.setFeatureState({ source: building.source, sourceLayer: building.sourceLayer, id: lockedBuildingId }, { locked: true });
+                
                 playSound('click');
                 speak("Цель захвачена");
             }
@@ -395,13 +382,39 @@
             document.getElementById('status-tag').innerText = "LOCKED";
             document.getElementById('status-tag').style.color = "var(--danger)";
             document.getElementById('target-type').innerText = "STRUCTURE";
+
+            // Визуальный эффект подсветки через фильтры слоя (если стиль позволяет менять paint runtime)
+            const layerId = building.layer.id;
+            map.setPaintProperty(layerId, 'fill-extrusion-color', [
+                'case',
+                ['boolean', ['feature-state', 'locked'], false],
+                '#ff3f34', // Цвет при захвате
+                '#aaa'      // Обычный цвет
+            ]);
+            map.setPaintProperty(layerId, 'fill-extrusion-opacity', [
+                'case',
+                ['boolean', ['feature-state', 'locked'], false],
+                0.9, 0.6
+            ]);
+
         } else {
+            if (lockedBuildingId !== null) {
+                // Пытаемся сбросить состояние, если ID был
+                map.setFeatureState({ source: 'openmaptiles', sourceLayer: 'building', id: lockedBuildingId }, { locked: false });
+                lockedBuildingId = null;
+            }
             ch.classList.remove('locked');
             document.getElementById('lock-text').innerText = "SCANNING...";
             document.getElementById('status-tag').innerText = "READY";
             document.getElementById('status-tag').style.color = "var(--neon)";
             document.getElementById('target-type').innerText = "NULL";
         }
+    }
+
+    map.on('move', () => {
+        const c = map.getCenter();
+        document.getElementById('coords').innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
+        updateBuildingHighlight();
     });
 
     window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
