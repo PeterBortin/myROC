@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>ОРБИТАЛЬНЫЙ УДАР - КИЕВ: ОПЕРАЦИЯ</title>
+    <title>КИЕВ: ОПЕРАЦИЯ</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
@@ -17,7 +17,6 @@
 
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: var(--neon); -webkit-font-smoothing: antialiased; }
         
-        /* Исправлена яркость карт для лучшей видимости */
         #map { position: absolute; inset: 0; transition: filter 0.4s ease; filter: brightness(0.7) contrast(1.2) saturate(0.9); }
         #canvas-fx { position: absolute; inset: 0; z-index: 150; pointer-events: none; }
 
@@ -36,14 +35,12 @@
         }
         @keyframes scan { from { top: -5%; } to { top: 105%; } }
 
-        /* ПРИЦЕЛ: НОВЫЕ КРУГОВЫЕ ЭЛЕМЕНТЫ */
         .crosshair {
             position: absolute; top: 50%; left: 50%; width: 280px; height: 280px;
             transform: translate(-50%, -50%); z-index: 200; pointer-events: none;
             transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
         }
         
-        /* Вращающиеся кольца */
         .ch-ring {
             position: absolute; inset: 0; border: 1px dashed var(--neon); border-radius: 50%; opacity: 0.2;
             animation: ch-rotate 15s linear infinite;
@@ -57,7 +54,6 @@
             position: absolute; inset: 20px; border: 1px double var(--warn); border-radius: 50%; opacity: 0.15;
             animation: ch-rotate 10s linear infinite;
         }
-
         .ch-box { 
             position: absolute; inset: 60px; border: 1px solid var(--neon); opacity: 0.2;
             animation: ch-rotate 8s linear infinite reverse;
@@ -71,7 +67,6 @@
         .br-bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
         .br-br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
 
-        /* Состояние LOCK */
         .locked { width: 200px; height: 200px; }
         .locked .ch-bracket { border-width: 4px; border-color: var(--neon); width: 60px; height: 60px; box-shadow: 0 0 20px var(--neon); }
         .locked .ch-ring { opacity: 0.6; inset: -10px; border-style: solid; }
@@ -91,7 +86,6 @@
         }
         .locked .data-stream { opacity: 0.8; left: -140px; }
 
-        /* ИНТЕРФЕЙС */
         .top-bar {
             position: absolute; top: 15px; left: 15px; right: 15px;
             display: flex; justify-content: space-between; font-size: 10px; z-index: 300;
@@ -122,7 +116,6 @@
 
         .weapon-label { font-size: 9px; position: absolute; bottom: -20px; width: 140px; text-align: center; left: -45px; color: var(--warn); text-transform: uppercase; font-weight: bold;}
 
-        /* ЭФФЕКТЫ */
         .predator-glitch { animation: glitch-anim 0.4s steps(3); }
         @keyframes glitch-anim {
             0% { filter: contrast(3) hue-rotate(90deg); transform: skewX(10deg); }
@@ -169,7 +162,7 @@
 </div>
 
 <div class="controls-container">
-    <button class="icon-btn" onclick="cycleStyles(); playSound('click')">
+    <button class="icon-btn" onclick="cycleStyles();">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
     </button>
     
@@ -178,7 +171,7 @@
     </button>
     
     <div style="position:relative">
-        <button class="icon-btn" onclick="cycleWeapons(); playSound('click')">
+        <button class="icon-btn" onclick="cycleWeapons();">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M14.5 18l-2.5 2.5-2.5-2.5 1.4-1.4 1.1 1.1 1.1-1.1 1.4 1.4zM7 6c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v2H7V6z"/></svg>
         </button>
         <div class="weapon-label" id="weapon-btn-label">WPN: PLASMA</div>
@@ -186,6 +179,30 @@
 </div>
 
 <script>
+    // --- ГОЛОСОВОЙ ДВИЖОК ---
+    const synth = window.speechSynthesis;
+    let femaleVoice = null;
+
+    function initVoices() {
+        const voices = synth.getVoices();
+        // Пытаемся найти женский русский голос или любой женский
+        femaleVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('female') || v.name.includes('Google') || v.name.includes('Irina'))) 
+                     || voices.find(v => v.name.includes('female')) || voices[0];
+    }
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = initVoices;
+    }
+
+    function speak(text) {
+        if (synth.speaking) synth.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.voice = femaleVoice;
+        utter.pitch = 0.8; // Чуть более кибернетический тон
+        utter.rate = 1.1;
+        synth.speak(utter);
+    }
+
+    // --- ЗВУКОВОЙ ДВИЖОК (ЭФФЕКТЫ) ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -231,17 +248,19 @@
 
     let currentWpn = 0;
     const weapons = [
-        { id: 'plasma', name: 'PLASMA CANNON', color: '#32ff7e', sound: 'laser', scatter: 1, delay: 0 },
-        { id: 'missile', name: 'HELLFIRE V2', color: '#ff3f34', sound: 'click', scatter: 2, delay: 800 },
-        { id: 'swarm', name: 'DRONE SWARM', color: '#ffaf40', sound: 'click', scatter: 8, delay: 200 },
-        { id: 'kinetic', name: 'KINETIC ROD', color: '#ffffff', sound: 'kinetic', scatter: 1, delay: 1500 },
-        { id: 'emp', name: 'EMP SHOCK', color: '#00d2ff', sound: 'emp', scatter: 1, delay: 100 }
+        { id: 'plasma', name: 'PLASMA CANNON', voice: 'Плазменная пушка выбрана', color: '#32ff7e', sound: 'laser', scatter: 1, delay: 0 },
+        { id: 'missile', name: 'HELLFIRE V2', voice: 'Ракеты Хэлфайер активны', color: '#ff3f34', sound: 'click', scatter: 2, delay: 800 },
+        { id: 'swarm', name: 'DRONE SWARM', voice: 'Рой дронов готов', color: '#ffaf40', sound: 'click', scatter: 8, delay: 200 },
+        { id: 'kinetic', name: 'KINETIC ROD', voice: 'Кинетический жезл заряжен', color: '#ffffff', sound: 'kinetic', scatter: 1, delay: 1500 },
+        { id: 'emp', name: 'EMP SHOCK', voice: 'Электромагнитный импульс готов', color: '#00d2ff', sound: 'emp', scatter: 1, delay: 100 }
     ];
 
     function cycleWeapons() {
+        playSound('click');
         currentWpn = (currentWpn + 1) % weapons.length;
         document.getElementById('weapon-btn-label').innerText = "WPN: " + weapons[currentWpn].name;
         document.getElementById('weapon-btn-label').style.color = weapons[currentWpn].color;
+        speak(weapons[currentWpn].voice);
     }
 
     let craters = { type: 'FeatureCollection', features: [] };
@@ -252,23 +271,21 @@
     let styleIndex = 0;
 
     const styles = [
-        'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-        'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-        {
-            "version": 8, "sources": {"osm": {"type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256}},
-            "layers": [{"id": "osm", "type": "raster", "source": "osm"}]
-        }
+        { name: 'Темный режим', url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' },
+        { name: 'Светлый режим', url: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json' },
+        { name: 'Спутниковый канал', url: { "version": 8, "sources": {"osm": {"type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256}}, "layers": [{"id": "osm", "type": "raster", "source": "osm"}]}}
     ];
 
     const map = new maplibregl.Map({
-        container: 'map', style: styles[0], center: [30.5234, 50.4501], zoom: 16, pitch: 45, antialias: true, attributionControl: false
+        container: 'map', style: styles[0].url, center: [30.5234, 50.4501], zoom: 16, pitch: 45, antialias: true, attributionControl: false
     });
 
     function cycleStyles() {
         body.classList.add('predator-glitch');
         playSound('emp');
         styleIndex = (styleIndex + 1) % styles.length;
-        map.setStyle(styles[styleIndex]);
+        map.setStyle(styles[styleIndex].url);
+        speak("Смена режима наблюдения. " + styles[styleIndex].name);
         setTimeout(() => body.classList.remove('predator-glitch'), 400);
     }
 
@@ -307,6 +324,8 @@
         const wpn = weapons[currentWpn];
         const target = map.getCenter(); const screenPos = map.project(target);
         const currentZoom = map.getZoom(); const zoomScale = Math.pow(2, currentZoom - 15);
+
+        speak("Удар подтвержден. Огонь.");
 
         if (wpn.id === 'plasma') {
             playSound('laser');
@@ -362,13 +381,15 @@
         const c = map.getCenter();
         document.getElementById('coords').innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
         
-        // ЛОГИКА ЗАХВАТА: Реагирует только на здания (building)
         const features = map.queryRenderedFeatures([window.innerWidth/2, window.innerHeight/2]);
         const isBuilding = features.some(f => f.layer.id.includes('building') || f.layer.type === 'fill-extrusion');
         
         const ch = document.getElementById('ch-ui');
         if (isBuilding) {
-            if (!ch.classList.contains('locked')) playSound('click');
+            if (!ch.classList.contains('locked')) {
+                playSound('click');
+                speak("Цель захвачена");
+            }
             ch.classList.add('locked');
             document.getElementById('lock-text').innerText = "TARGET ACQUIRED";
             document.getElementById('status-tag').innerText = "LOCKED";
