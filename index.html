@@ -15,7 +15,15 @@
             --bg-glass: rgba(5, 10, 8, 0.7);
         }
 
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: var(--neon); -webkit-font-smoothing: antialiased; }
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace; 
+            color: var(--neon); 
+            -webkit-font-smoothing: antialiased;
+            touch-action: none; 
+        }
         
         #map { position: absolute; inset: 0; transition: filter 0.4s ease; filter: brightness(0.7) contrast(1.2) saturate(0.9); }
         #canvas-fx { position: absolute; inset: 0; z-index: 150; pointer-events: none; }
@@ -111,6 +119,8 @@
             color: var(--danger); cursor: pointer; font-family: inherit; font-weight: bold; letter-spacing: 3px;
             clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); transition: 0.2s;
             box-shadow: 0 0 10px rgba(255, 63, 52, 0.3);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .fire-btn:active { background: var(--danger); color: #000; transform: scale(0.95); }
 
@@ -166,7 +176,7 @@
         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
     </button>
     
-    <button class="fire-btn" onmousedown="ignite()" ontouchstart="ignite()">
+    <button class="fire-btn" onmousedown="ignite()" ontouchstart="handleTouchFire(event)">
         LAUNCH ATTACK
     </button>
     
@@ -268,6 +278,7 @@
     let particles = [];
     let styleIndex = 0;
     let lockedBuildingId = null;
+    let currentLockedSource = null;
 
     const styles = [
         { name: 'Темный режим', url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' },
@@ -276,12 +287,22 @@
     ];
 
     const map = new maplibregl.Map({
-        container: 'map', style: styles[0].url, center: [30.5234, 50.4501], zoom: 16, pitch: 45, antialias: true, attributionControl: false
+        container: 'map', 
+        style: styles[0].url, 
+        center: [30.5234, 50.4501], 
+        zoom: 16, 
+        pitch: 45, 
+        antialias: true, 
+        attributionControl: false,
+        touchZoomRotate: true,
+        dragPan: true,
+        preserveDrawingBuffer: true
     });
 
     function cycleStyles() {
         body.classList.add('predator-glitch');
         playSound('emp');
+        lockedBuildingId = null; 
         styleIndex = (styleIndex + 1) % styles.length;
         map.setStyle(styles[styleIndex].url);
         speak("Смена режима наблюдения. " + styles[styleIndex].name);
@@ -311,6 +332,11 @@
         requestAnimationFrame(animate);
     }
     animate();
+
+    function handleTouchFire(e) {
+        if (e.cancelable) e.preventDefault();
+        ignite();
+    }
 
     function ignite() {
         const wpn = weapons[currentWpn];
@@ -358,49 +384,52 @@
         document.getElementById('alt-val').innerText = (340 + Math.random()).toFixed(2) + " KM";
     }, 1000);
 
-    // Функция обновления подсветки зданий
     function updateBuildingHighlight() {
+        // Пропускаем обработку для спутникового режима (там нет векторных зданий)
+        if (styleIndex === 2) return;
+
         const features = map.queryRenderedFeatures([window.innerWidth/2, window.innerHeight/2]);
         const building = features.find(f => f.layer.id.includes('building') || f.layer.type === 'fill-extrusion');
         const ch = document.getElementById('ch-ui');
 
-        if (building) {
+        if (building && building.id) {
             if (lockedBuildingId !== building.id) {
-                // Снимаем старый захват
-                if (lockedBuildingId !== null) {
-                    map.setFeatureState({ source: building.source, sourceLayer: building.sourceLayer, id: lockedBuildingId }, { locked: false });
+                if (lockedBuildingId !== null && currentLockedSource) {
+                    try {
+                        map.setFeatureState({ source: currentLockedSource.source, sourceLayer: currentLockedSource.sourceLayer, id: lockedBuildingId }, { locked: false });
+                    } catch(e) {}
                 }
                 lockedBuildingId = building.id;
-                // Активируем новый захват в состоянии карты (если стиль поддерживает state)
-                map.setFeatureState({ source: building.source, sourceLayer: building.sourceLayer, id: lockedBuildingId }, { locked: true });
+                currentLockedSource = { source: building.source, sourceLayer: building.sourceLayer };
+                
+                try {
+                    map.setFeatureState({ source: building.source, sourceLayer: building.sourceLayer, id: lockedBuildingId }, { locked: true });
+                } catch(e) {}
                 
                 playSound('click');
                 speak("Цель захвачена");
+
+                const layerId = building.layer.id;
+                // Применяем краску только если это векторный слой
+                if (map.getLayer(layerId)) {
+                    map.setPaintProperty(layerId, 'fill-extrusion-color', [
+                        'case',
+                        ['boolean', ['feature-state', 'locked'], false],
+                        '#ff3f34',
+                        '#aaa'
+                    ]);
+                }
             }
             ch.classList.add('locked');
             document.getElementById('lock-text').innerText = "TARGET ACQUIRED";
             document.getElementById('status-tag').innerText = "LOCKED";
             document.getElementById('status-tag').style.color = "var(--danger)";
             document.getElementById('target-type').innerText = "STRUCTURE";
-
-            // Визуальный эффект подсветки через фильтры слоя (если стиль позволяет менять paint runtime)
-            const layerId = building.layer.id;
-            map.setPaintProperty(layerId, 'fill-extrusion-color', [
-                'case',
-                ['boolean', ['feature-state', 'locked'], false],
-                '#ff3f34', // Цвет при захвате
-                '#aaa'      // Обычный цвет
-            ]);
-            map.setPaintProperty(layerId, 'fill-extrusion-opacity', [
-                'case',
-                ['boolean', ['feature-state', 'locked'], false],
-                0.9, 0.6
-            ]);
-
         } else {
-            if (lockedBuildingId !== null) {
-                // Пытаемся сбросить состояние, если ID был
-                map.setFeatureState({ source: 'openmaptiles', sourceLayer: 'building', id: lockedBuildingId }, { locked: false });
+            if (lockedBuildingId !== null && currentLockedSource) {
+                try {
+                    map.setFeatureState({ source: currentLockedSource.source, sourceLayer: currentLockedSource.sourceLayer, id: lockedBuildingId }, { locked: false });
+                } catch(e) {}
                 lockedBuildingId = null;
             }
             ch.classList.remove('locked');
@@ -414,7 +443,8 @@
     map.on('move', () => {
         const c = map.getCenter();
         document.getElementById('coords').innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
-        updateBuildingHighlight();
+        // Используем requestAnimationFrame для предотвращения блокировки UI при движении
+        requestAnimationFrame(updateBuildingHighlight);
     });
 
     window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
