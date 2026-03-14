@@ -443,7 +443,7 @@
 
         let styleIndex = 0;
         let lockedBuildingIds = new Set(); 
-        let buildingSigs = new Map(); // Хранилище: ID -> {floors, entities}
+        let buildingSigs = new Map(); // Хранилище: ID -> {floors, entities, scanProgress}
 
         function setup3D() {
             if (styleIndex === 2 || !map.isStyleLoaded()) return;
@@ -479,10 +479,10 @@
                     minzoom: 14,
                     filter: ['in', ['id'], ['literal', []]], 
                     paint: {
-                        'fill-extrusion-color': '#ff3f34',
+                        'fill-extrusion-color': '#ff1a1a', // Более агрессивный красный
                         'fill-extrusion-height': ['get', 'render_height'],
                         'fill-extrusion-base': ['get', 'render_min_height'],
-                        'fill-extrusion-opacity': 0.15 
+                        'fill-extrusion-opacity': 0.45 
                     }
                 }, labelLayer ? labelLayer.id : null);
             }
@@ -497,8 +497,8 @@
                     filter: ['in', ['id'], ['literal', []]],
                     paint: {
                         'line-color': '#ff3f34',
-                        'line-width': 1.5,
-                        'line-opacity': 0.6
+                        'line-width': 2.5, // Утолщенный контур
+                        'line-opacity': 0.8
                     }
                 });
             }
@@ -552,30 +552,33 @@
             const allFeatures = map.queryRenderedFeatures({ layers: ['3d-buildings-base'] });
 
             const newLockedSet = new Set();
-            const newLockedFeatures = [];
 
             for (const feature of allFeatures) {
+                // Используем ID объекта из свойств карты
+                const bId = feature.id || (feature.properties && feature.properties.id);
+                if (!bId) continue;
+
                 if (isAnyPartOfBuildingInside(feature, bbox)) {
-                    newLockedSet.add(feature.id);
-                    newLockedFeatures.push(feature);
+                    newLockedSet.add(bId);
                     
-                    // ЕСЛИ ЭТО НОВОЕ ЗДАНИЕ - ГЕНЕРИРУЕМ ЕГО ОДИН РАЗ И ПРИВЯЗЫВАЕМ К ID
-                    if (!buildingSigs.has(feature.id)) {
-                        const height = feature.properties.render_height || 30;
-                        const floorsCount = Math.floor(height / 3.5); 
+                    // ПРИВЯЗКА К ID: Если данных об этом здании нет, создаем их навсегда
+                    if (!buildingSigs.has(bId)) {
+                        const height = feature.properties.render_height || 20;
+                        const floorsCount = Math.max(2, Math.floor(height / 3.8)); 
                         const entities = [];
                         
-                        const peopleCount = 2 + Math.floor(Math.random() * 6);
+                        // Генерируем случайное, но фиксированное кол-во людей для этого ID
+                        const peopleCount = 1 + Math.floor(Math.random() * 5);
                         for(let i=0; i < peopleCount; i++) {
                             entities.push({
                                 floor: Math.floor(Math.random() * floorsCount),
-                                relX: 0.15 + Math.random() * 0.7,
-                                relY: 0.15 + Math.random() * 0.7,
+                                relX: 0.2 + Math.random() * 0.6,
+                                relY: 0.2 + Math.random() * 0.6,
                                 pulse: Math.random() * Math.PI,
                                 phase: Math.random() * 10
                             });
                         }
-                        buildingSigs.set(feature.id, { 
+                        buildingSigs.set(bId, { 
                             floors: floorsCount, 
                             entities, 
                             scanProgress: 0 
@@ -610,6 +613,11 @@
                     lockText.innerText = 'СКАНИРОВАНИЕ...';
                     statusTag.innerText = 'ГОТОВ';
                     targetTypeSpan.innerText = 'N/A';
+                    // Сбрасываем прогресс сканирования для тех, кто вышел из прицела, 
+                    // чтобы при следующем наведении сканирование началось заново
+                    buildingSigs.forEach((val, key) => {
+                        if (!newLockedSet.has(key)) val.scanProgress = 0;
+                    });
                 }
             }
         }
@@ -643,63 +651,70 @@
                     const data = buildingSigs.get(id);
                     if (!data) return;
                     
-                    if (data.scanProgress < 1) data.scanProgress += 0.02;
+                    // Постепенно заполняем прогресс сканирования
+                    if (data.scanProgress < 1) data.scanProgress += 0.015;
                     
                     const floors = data.floors;
-                    const spacing = (bbox.bottom - bbox.top) / floors;
+                    const h = bbox.bottom - bbox.top;
+                    const spacing = h / floors;
 
                     // Отрисовка этажей (сетка)
                     for (let f = 0; f < floors; f++) {
                         const y = bbox.top + (f * spacing);
-                        const alpha = (0.08 + Math.sin(globalScanTimer + f*0.3) * 0.04) * data.scanProgress;
+                        const alpha = (0.12 + Math.sin(globalScanTimer + f*0.4) * 0.06) * data.scanProgress;
                         
                         ctx.strokeStyle = `rgba(0, 210, 255, ${alpha})`;
                         ctx.lineWidth = 1;
                         ctx.beginPath();
-                        ctx.moveTo(bbox.left + 8, y);
-                        ctx.lineTo(bbox.right - 8, y);
+                        ctx.moveTo(bbox.left + 10, y);
+                        ctx.lineTo(bbox.right - 10, y);
                         ctx.stroke();
 
-                        // Отрисовка сигнатур людей
+                        // Отрисовка сигнатур людей (только если сканирование продвинулось)
                         data.entities.forEach(ent => {
                             if (ent.floor === f) {
-                                ent.pulse += 0.035;
-                                const sizePulse = Math.abs(Math.sin(ent.pulse)) * 2.5;
+                                ent.pulse += 0.05;
+                                const sizePulse = Math.abs(Math.sin(ent.pulse)) * 3;
                                 const posX = bbox.left + (bbox.right - bbox.left) * ent.relX;
                                 const posY = y + (Math.sin(ent.pulse + ent.phase) * 1.5);
 
-                                const grad = ctx.createRadialGradient(posX, posY, 0, posX, posY, 5 + sizePulse);
-                                grad.addColorStop(0, `rgba(255, 63, 52, ${0.8 * data.scanProgress})`);
+                                // Аура био-сигнала
+                                const grad = ctx.createRadialGradient(posX, posY, 0, posX, posY, 6 + sizePulse);
+                                grad.addColorStop(0, `rgba(255, 63, 52, ${0.7 * data.scanProgress})`);
                                 grad.addColorStop(1, 'rgba(255, 63, 52, 0)');
 
                                 ctx.fillStyle = grad;
                                 ctx.beginPath();
-                                ctx.arc(posX, posY, 7 + sizePulse, 0, Math.PI * 2);
+                                ctx.arc(posX, posY, 8 + sizePulse, 0, Math.PI * 2);
                                 ctx.fill();
 
-                                ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * data.scanProgress})`;
+                                // Ядро
+                                ctx.fillStyle = `rgba(255, 255, 255, ${0.8 * data.scanProgress})`;
                                 ctx.beginPath();
-                                ctx.arc(posX, posY, 1, 0, Math.PI * 2);
+                                ctx.arc(posX, posY, 1.5, 0, Math.PI * 2);
                                 ctx.fill();
                             }
                         });
                     }
                 });
 
-                // Сканирующая линия
-                const scanY = bbox.top + ((Math.sin(globalScanTimer * 0.7) + 1) / 2) * (bbox.bottom - bbox.top);
-                ctx.strokeStyle = 'rgba(50, 255, 126, 0.4)';
+                // Сканирующая линия в прицеле
+                const scanPos = (Math.sin(globalScanTimer * 0.8) + 1) / 2;
+                const scanY = bbox.top + scanPos * (bbox.bottom - bbox.top);
+                ctx.strokeStyle = 'rgba(50, 255, 126, 0.6)';
                 ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
                 ctx.beginPath();
-                ctx.moveTo(bbox.left, scanY);
-                ctx.lineTo(bbox.right, scanY);
+                ctx.moveTo(bbox.left - 5, scanY);
+                ctx.lineTo(bbox.right + 5, scanY);
                 ctx.stroke();
+                ctx.setLineDash([]);
             }
 
             // Рендер частиц
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
-                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                p.x += p.vx; p.y += p.vy; p.life -= 0.025;
                 if (p.life <= 0) { particles.splice(i, 1); continue; }
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
@@ -715,23 +730,23 @@
         function ignite() {
             const wpn = weapons[currentWpn];
             const screenPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-            speak('Залп!');
+            speak('Огонь!');
             AudioManager.play(wpn.sound);
             
             if (wpn.id === 'plasma') {
-                ctx.strokeStyle = wpn.color; ctx.lineWidth = 12;
-                ctx.beginPath(); ctx.moveTo(screenPos.x, 0); ctx.lineTo(screenPos.x, screenPos.y - 20); ctx.stroke();
+                ctx.strokeStyle = wpn.color; ctx.lineWidth = 20;
+                ctx.beginPath(); ctx.moveTo(screenPos.x, 0); ctx.lineTo(screenPos.x, screenPos.y); ctx.stroke();
             }
             
-            for (let i = 0; i < 50; i++) {
+            for (let i = 0; i < 60; i++) {
                 particles.push({
-                    x: screenPos.x + (Math.random() - 0.5) * 40, y: screenPos.y + (Math.random() - 0.5) * 40,
-                    vx: (Math.random() - 0.5) * 25, vy: (Math.random() - 0.5) * 25,
-                    size: Math.random() * 10 + 3, life: 1.0, color: wpn.color
+                    x: screenPos.x, y: screenPos.y,
+                    vx: (Math.random() - 0.5) * 35, vy: (Math.random() - 0.5) * 35,
+                    size: Math.random() * 12 + 4, life: 1.0, color: wpn.color
                 });
             }
-            body.style.filter = "brightness(3) contrast(1.5)";
-            setTimeout(() => body.style.filter = "none", 150);
+            body.style.filter = "brightness(4) contrast(1.2)";
+            setTimeout(() => body.style.filter = "none", 100);
         }
 
         function cycleStyles() {
@@ -739,7 +754,6 @@
             AudioManager.play('emp');
             styleIndex = (styleIndex + 1) % styles.length;
             lockedBuildingIds.clear(); 
-            // Мы НЕ очищаем buildingSigs, чтобы сохранить привязку к ID зданий при возврате к стилю
             map.setStyle(styles[styleIndex].url);
             speak('Режим: ' + styles[styleIndex].name);
             setTimeout(() => body.classList.remove('predator-glitch'), 500);
@@ -764,13 +778,13 @@
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
         setInterval(() => {
-            altSpan.innerText = (340 + Math.random() * 0.6).toFixed(2) + ' KM';
+            altSpan.innerText = (340 + Math.random() * 0.8).toFixed(2) + ' KM';
             const c = map.getCenter();
             coordsSpan.innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
-        }, 1800);
+        }, 2000);
 
-        document.addEventListener('click', () => AudioManager.init());
-        setTimeout(() => speak('Интерфейс готов.'), 1000);
+        document.addEventListener('click', () => AudioManager.init(), {once: true});
+        setTimeout(() => speak('Нейро-интерфейс загружен.'), 1500);
     })();
 </script>
 </body>
