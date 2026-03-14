@@ -16,39 +16,20 @@
         }
 
         body, html { 
-            margin: 0; 
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background: #000; 
-            overflow: hidden; 
-            font-family: 'Courier New', monospace; 
-            color: var(--neon); 
-            -webkit-font-smoothing: antialiased;
-            touch-action: none; 
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: #000; overflow: hidden; font-family: 'Courier New', monospace; 
+            color: var(--neon); -webkit-font-smoothing: antialiased; touch-action: none; 
         }
         
-        /* Исправлено позиционирование для предотвращения сдвига */
         #map { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100vw; 
-            height: 100vh; 
-            transition: filter 0.4s ease; 
-            filter: brightness(0.7) contrast(1.2) saturate(0.9); 
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; 
+            filter: brightness(0.6) contrast(1.3) saturate(0.8); 
         }
         
         #canvas-fx { position: absolute; inset: 0; z-index: 150; pointer-events: none; }
-
         .vignette { position: absolute; inset: 0; background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%); z-index: 110; pointer-events: none; }
         .scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 50%, rgba(50, 255, 126, 0.03) 50%); background-size: 100% 4px; z-index: 120; pointer-events: none; }
-        
-        .grid-ui { position: absolute; inset: 0; background-image: 
-            linear-gradient(rgba(50, 255, 126, 0.05) 1px, transparent 1px), 
-            linear-gradient(90deg, rgba(50, 255, 126, 0.05) 1px, transparent 1px); 
-            background-size: 50px 50px; z-index: 105; pointer-events: none;
-        }
+        .grid-ui { position: absolute; inset: 0; background-image: linear-gradient(rgba(50, 255, 126, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(50, 255, 126, 0.05) 1px, transparent 1px); background-size: 50px 50px; z-index: 105; pointer-events: none; }
 
         .scanner-line {
             position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--neon), transparent);
@@ -62,24 +43,10 @@
             transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
         }
         
-        .ch-ring {
-            position: absolute; inset: 0; border: 1px dashed var(--neon); border-radius: 50%; opacity: 0.2;
-            animation: ch-rotate 15s linear infinite;
-        }
-        .ch-ring-inner {
-            position: absolute; inset: 40px; border: 2px solid var(--info); border-radius: 50%; opacity: 0.1;
-            clip-path: polygon(0 0, 100% 0, 100% 30%, 0 30%);
-            animation: ch-rotate 4s linear infinite reverse;
-        }
-        .ch-ring-mid {
-            position: absolute; inset: 20px; border: 1px double var(--warn); border-radius: 50%; opacity: 0.15;
-            animation: ch-rotate 10s linear infinite;
-        }
-        .ch-box { 
-            position: absolute; inset: 60px; border: 1px solid var(--neon); opacity: 0.2;
-            animation: ch-rotate 8s linear infinite reverse;
-        }
-
+        .ch-ring { position: absolute; inset: 0; border: 1px dashed var(--neon); border-radius: 50%; opacity: 0.2; animation: ch-rotate 15s linear infinite; }
+        .ch-ring-inner { position: absolute; inset: 40px; border: 2px solid var(--info); border-radius: 50%; opacity: 0.1; clip-path: polygon(0 0, 100% 0, 100% 30%, 0 30%); animation: ch-rotate 4s linear infinite reverse; }
+        .ch-ring-mid { position: absolute; inset: 20px; border: 1px double var(--warn); border-radius: 50%; opacity: 0.15; animation: ch-rotate 10s linear infinite; }
+        .ch-box { position: absolute; inset: 60px; border: 1px solid var(--neon); opacity: 0.2; animation: ch-rotate 8s linear infinite reverse; }
         @keyframes ch-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .ch-bracket { position: absolute; width: 40px; height: 40px; border: 1px solid var(--danger); transition: 0.3s; }
@@ -91,62 +58,23 @@
         .locked { width: 200px; height: 200px; }
         .locked .ch-bracket { border-width: 4px; border-color: var(--neon); width: 60px; height: 60px; box-shadow: 0 0 20px var(--neon); }
         .locked .ch-ring { opacity: 0.6; inset: -10px; border-style: solid; }
-        .locked .ch-ring-inner { opacity: 0.5; inset: 10px; }
-        .locked .ch-ring-mid { opacity: 0.4; inset: 5px; animation-duration: 2s; }
-        
-        .locked-info { 
-            position: absolute; top: -50px; font-size: 10px; width: 100%; text-align: center;
-            letter-spacing: 5px; color: var(--danger); transition: 0.3s; text-shadow: 0 0 5px var(--danger);
-        }
+        .locked-info { position: absolute; top: -50px; font-size: 10px; width: 100%; text-align: center; letter-spacing: 5px; color: var(--danger); transition: 0.3s; text-shadow: 0 0 5px var(--danger); }
         .locked .locked-info { color: var(--neon); top: -65px; font-weight: bold; transform: scale(1.2); text-shadow: 0 0 10px var(--neon); }
 
-        .data-stream {
-            position: absolute; left: -110px; top: 50%; height: 100px; width: 90px;
-            font-size: 8px; color: var(--neon); overflow: hidden; opacity: 0; transition: 0.3s;
-            background: rgba(0,0,0,0.4); padding: 5px; border-left: 1px solid var(--neon);
-        }
+        .data-stream { position: absolute; left: -110px; top: 50%; height: 100px; width: 90px; font-size: 8px; color: var(--neon); overflow: hidden; opacity: 0; transition: 0.3s; background: rgba(0,0,0,0.4); padding: 5px; border-left: 1px solid var(--neon); }
         .locked .data-stream { opacity: 0.8; left: -140px; }
 
-        .top-bar {
-            position: absolute; top: 15px; left: 15px; right: 15px;
-            display: flex; justify-content: space-between; font-size: 10px; z-index: 300;
-            pointer-events: none; border-bottom: 1px solid rgba(50, 255, 126, 0.2);
-            background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent); padding: 5px;
-        }
+        .top-bar { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; font-size: 10px; z-index: 300; pointer-events: none; border-bottom: 1px solid rgba(50, 255, 126, 0.2); background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent); padding: 5px; }
+        .controls-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; z-index: 300; }
 
-        .controls-container {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; z-index: 300;
-        }
-
-        .icon-btn {
-            background: rgba(0,0,0,0.8); border: 1px solid var(--neon); color: var(--neon);
-            width: 50px; height: 50px; cursor: pointer; transition: 0.2s;
-            clip-path: polygon(20% 0%, 100% 0%, 80% 100%, 0% 100%);
-            display: flex; align-items: center; justify-content: center;
-            padding: 0; margin: 0;
-        }
+        .icon-btn { background: rgba(0,0,0,0.8); border: 1px solid var(--neon); color: var(--neon); width: 50px; height: 50px; cursor: pointer; transition: 0.2s; clip-path: polygon(20% 0%, 100% 0%, 80% 100%, 0% 100%); display: flex; align-items: center; justify-content: center; }
         .icon-btn:hover { background: var(--neon); color: #000; box-shadow: 0 0 15px var(--neon); }
-
-        .fire-btn {
-            width: 180px; height: 50px; background: rgba(255, 63, 52, 0.1); border: 2px solid var(--danger);
-            color: var(--danger); cursor: pointer; font-family: inherit; font-weight: bold; letter-spacing: 3px;
-            clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); transition: 0.2s;
-            box-shadow: 0 0 10px rgba(255, 63, 52, 0.3);
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+        .fire-btn { width: 180px; height: 50px; background: rgba(255, 63, 52, 0.1); border: 2px solid var(--danger); color: var(--danger); cursor: pointer; font-family: inherit; font-weight: bold; letter-spacing: 3px; clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); transition: 0.2s; box-shadow: 0 0 10px rgba(255, 63, 52, 0.3); -webkit-tap-highlight-color: transparent; }
         .fire-btn:active { background: var(--danger); color: #000; transform: scale(0.95); }
-
         .weapon-label { font-size: 9px; position: absolute; bottom: -20px; width: 140px; text-align: center; left: -45px; color: var(--warn); text-transform: uppercase; font-weight: bold;}
 
         .predator-glitch { animation: glitch-anim 0.4s steps(3); }
-        @keyframes glitch-anim {
-            0% { filter: contrast(3) hue-rotate(90deg); transform: skewX(10deg); }
-            33% { filter: brightness(4) invert(1); transform: skewX(-10deg); }
-            66% { filter: sepia(1) saturate(5); transform: scale(1.1); }
-            100% { filter: none; transform: none; }
-        }
+        @keyframes glitch-anim { 0% { filter: contrast(3) hue-rotate(90deg); transform: skewX(10deg); } 33% { filter: brightness(4) invert(1); transform: skewX(-10deg); } 66% { filter: sepia(1) saturate(5); transform: scale(1.1); } 100% { filter: none; transform: none; } }
     </style>
 </head>
 <body id="main-body">
@@ -172,16 +100,10 @@
 
 <div class="crosshair" id="ch-ui">
     <div class="locked-info" id="lock-text">SCANNING...</div>
-    <div class="data-stream">
-        VEL_X: 7.6<br>HDG: 21.0<br>DIST: 402<br>TMP: -40C<br>RAD: 0.12<br>TRG: <span id="target-type">NULL</span>
-    </div>
-    <div class="ch-ring"></div>
-    <div class="ch-ring-inner"></div>
-    <div class="ch-ring-mid"></div>
-    <div class="ch-bracket br-tl"></div>
-    <div class="ch-bracket br-tr"></div>
-    <div class="ch-bracket br-bl"></div>
-    <div class="ch-bracket br-br"></div>
+    <div class="data-stream">VEL_X: 7.6<br>HDG: 21.0<br>DIST: 402<br>TMP: -40C<br>RAD: 0.12<br>TRG: <span id="target-type">NULL</span></div>
+    <div class="ch-ring"></div><div class="ch-ring-inner"></div><div class="ch-ring-mid"></div>
+    <div class="ch-bracket br-tl"></div><div class="ch-bracket br-tr"></div>
+    <div class="ch-bracket br-bl"></div><div class="ch-bracket br-br"></div>
     <div class="ch-box"></div>
 </div>
 
@@ -189,11 +111,7 @@
     <button class="icon-btn" onclick="cycleStyles();">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
     </button>
-    
-    <button class="fire-btn" onmousedown="ignite()" ontouchstart="handleTouchFire(event)">
-        LAUNCH ATTACK
-    </button>
-    
+    <button class="fire-btn" onmousedown="ignite()" ontouchstart="handleTouchFire(event)">LAUNCH ATTACK</button>
     <div style="position:relative">
         <button class="icon-btn" onclick="cycleWeapons();">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M14.5 18l-2.5 2.5-2.5-2.5 1.4-1.4 1.1 1.1 1.1-1.1 1.4 1.4zM7 6c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v2H7V6z"/></svg>
@@ -203,84 +121,59 @@
 </div>
 
 <script>
-    // --- ГОЛОСОВОЙ ДВИЖОК ---
     const synth = window.speechSynthesis;
     let femaleVoice = null;
-
     function initVoices() {
         const voices = synth.getVoices();
-        femaleVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('female') || v.name.includes('Google') || v.name.includes('Irina'))) 
-                     || voices.find(v => v.name.includes('female')) || voices[0];
+        femaleVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('female') || v.name.includes('Google') || v.name.includes('Irina'))) || voices[0];
     }
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = initVoices;
-    }
+    if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = initVoices;
 
     function speak(text) {
         if (synth.speaking) synth.cancel();
         const utter = new SpeechSynthesisUtterance(text);
-        utter.voice = femaleVoice;
-        utter.pitch = 0.8;
-        utter.rate = 1.1;
+        utter.voice = femaleVoice; utter.pitch = 0.8; utter.rate = 1.1;
         synth.speak(utter);
     }
 
-    // --- ЗВУКОВОЙ ДВИЖОК ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        const gain = audioCtx.createGain();
-        gain.connect(audioCtx.destination);
-        const osc = audioCtx.createOscillator();
-        osc.connect(gain);
-
-        if (type === 'click') {
-            osc.type = 'square'; osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-        } else if (type === 'laser') {
-            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(2000, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
-            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.5);
-        } else if (type === 'kinetic') {
-            osc.type = 'sine'; osc.frequency.setValueAtTime(50, audioCtx.currentTime);
-            osc.frequency.linearRampToValueAtTime(20, audioCtx.currentTime + 1);
-            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            osc.start(); osc.stop(audioCtx.currentTime + 1.2);
-        } else if (type === 'emp') {
-            osc.type = 'triangle'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
-            osc.frequency.setValueAtTime(3000, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        const gain = audioCtx.createGain(); gain.connect(audioCtx.destination);
+        const osc = audioCtx.createOscillator(); osc.connect(gain);
+        if (type === 'click') { 
+            osc.type = 'square'; osc.frequency.setValueAtTime(1000, audioCtx.currentTime); 
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1); 
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'laser') { 
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(2000, audioCtx.currentTime); 
+            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5); 
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+        } else if (type === 'emp') { 
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(100, audioCtx.currentTime); 
+            osc.frequency.setValueAtTime(3000, audioCtx.currentTime + 0.1); 
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
         } else if (type === 'boom') {
-            const noise = audioCtx.createBufferSource();
-            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+            const noise = audioCtx.createBufferSource(); 
+            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate); 
             const data = buffer.getChannelData(0);
             for (let i = 0; i < audioCtx.sampleRate; i++) data[i] = Math.random() * 2 - 1;
-            noise.buffer = buffer;
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass'; filter.frequency.setValueAtTime(400, audioCtx.currentTime);
-            noise.connect(filter); filter.connect(gain);
-            gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
-            noise.start(); noise.stop(audioCtx.currentTime + 1.5);
+            noise.buffer = buffer; 
+            const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+            noise.connect(filter); filter.connect(gain); gain.gain.setValueAtTime(0.8, audioCtx.currentTime); 
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5); noise.start(); noise.stop(audioCtx.currentTime + 1.5);
         }
     }
 
     let currentWpn = 0;
     const weapons = [
-        { id: 'plasma', name: 'PLASMA CANNON', voice: 'Плазменная пушка выбрана', color: '#32ff7e', sound: 'laser', scatter: 1, delay: 0 },
-        { id: 'missile', name: 'HELLFIRE V2', voice: 'Ракеты Хэлфайер активны', color: '#ff3f34', sound: 'click', scatter: 2, delay: 800 },
-        { id: 'swarm', name: 'DRONE SWARM', voice: 'Рой дронов готов', color: '#ffaf40', sound: 'click', scatter: 8, delay: 200 },
-        { id: 'kinetic', name: 'KINETIC ROD', voice: 'Кинетический жезл заряжен', color: '#ffffff', sound: 'kinetic', scatter: 1, delay: 1500 },
-        { id: 'emp', name: 'EMP SHOCK', voice: 'Электромагнитный импульс готов', color: '#00d2ff', sound: 'emp', scatter: 1, delay: 100 }
+        { id: 'plasma', name: 'PLASMA CANNON', voice: 'Плазменная пушка выбрана', color: '#32ff7e', sound: 'laser' },
+        { id: 'missile', name: 'HELLFIRE V2', voice: 'Ракеты Хэлфайер активны', color: '#ff3f34', sound: 'click' },
+        { id: 'swarm', name: 'DRONE SWARM', voice: 'Рой дронов готов', color: '#ffaf40', sound: 'click' }
     ];
 
     function cycleWeapons() {
-        playSound('click');
-        currentWpn = (currentWpn + 1) % weapons.length;
+        playSound('click'); currentWpn = (currentWpn + 1) % weapons.length;
         document.getElementById('weapon-btn-label').innerText = "WPN: " + weapons[currentWpn].name;
         document.getElementById('weapon-btn-label').style.color = weapons[currentWpn].color;
         speak(weapons[currentWpn].voice);
@@ -292,184 +185,198 @@
     let particles = [];
     let styleIndex = 0;
     let lockedBuildingId = null;
-    let currentLockedSource = null;
 
     const styles = [
         { name: 'Темный режим', url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' },
         { name: 'Светлый режим', url: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json' },
-        { name: 'Спутниковый канал', url: { "version": 8, "sources": {"osm": {"type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256}}, "layers": [{"id": "osm", "type": "raster", "source": "osm"}]}}
+        { name: 'Спутник', url: { "version": 8, "sources": {"osm": {"type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256}}, "layers": [{"id": "osm", "type": "raster", "source": "osm"}]}}
     ];
 
     const map = new maplibregl.Map({
         container: 'map', 
         style: styles[0].url, 
         center: [30.5234, 50.4501], 
-        zoom: 16, 
-        pitch: 45, 
+        zoom: 16.5, 
+        pitch: 60, 
+        bearing: -20, 
         antialias: true, 
         attributionControl: false,
-        touchZoomRotate: true,
-        dragPan: true,
-        preserveDrawingBuffer: true
+        maxPitch: 85
     });
 
-    function cycleStyles() {
-        body.classList.add('predator-glitch');
-        playSound('emp');
-        lockedBuildingId = null; 
-        styleIndex = (styleIndex + 1) % styles.length;
-        map.setStyle(styles[styleIndex].url);
+    function setup3D() {
+        if (styleIndex === 2 || !map.isStyleLoaded()) return; 
         
-        // Принудительное обновление размера после смены стиля для фикса сдвига
-        map.once('styledata', () => {
-            map.resize();
-        });
+        const style = map.getStyle();
+        const sourceId = style.sources['carto'] ? 'carto' : (style.sources['openmaptiles'] ? 'openmaptiles' : null);
+        
+        if (!sourceId) return;
 
-        speak("Смена режима наблюдения. " + styles[styleIndex].name);
+        const labelLayer = style.layers.find(l => l.type === 'symbol');
+
+        // Слой для обычных зданий (всегда отрисовываются)
+        if (!map.getLayer('3d-buildings-base')) {
+            map.addLayer({
+                'id': '3d-buildings-base',
+                'source': sourceId,
+                'source-layer': 'building',
+                'type': 'fill-extrusion',
+                'minzoom': 14,
+                'paint': {
+                    'fill-extrusion-color': '#333',
+                    'fill-extrusion-height': ['get', 'render_height'],
+                    'fill-extrusion-base': ['get', 'render_min_height'],
+                    'fill-extrusion-opacity': 0.8
+                }
+            }, labelLayer ? labelLayer.id : null);
+        }
+
+        // Слой для подсвеченного здания
+        if (!map.getLayer('3d-buildings-locked')) {
+            map.addLayer({
+                'id': '3d-buildings-locked',
+                'source': sourceId,
+                'source-layer': 'building',
+                'type': 'fill-extrusion',
+                'minzoom': 14,
+                'filter': ['==', ['id'], ''], // Изначально фильтр пустой
+                'paint': {
+                    'fill-extrusion-color': '#ff3f34',
+                    'fill-extrusion-height': ['get', 'render_height'],
+                    'fill-extrusion-base': ['get', 'render_min_height'],
+                    'fill-extrusion-opacity': 1.0
+                }
+            }, labelLayer ? labelLayer.id : null);
+        }
+    }
+
+    map.on('load', setup3D);
+    map.on('styledata', setup3D);
+
+    function cycleStyles() {
+        body.classList.add('predator-glitch'); playSound('emp');
+        styleIndex = (styleIndex + 1) % styles.length;
+        lockedBuildingId = null;
+        map.setStyle(styles[styleIndex].url);
+        speak("Смена режима: " + styles[styleIndex].name);
         setTimeout(() => body.classList.remove('predator-glitch'), 400);
     }
 
-    class Particle {
-        constructor(x, y, color, zoomScale, isKinetic = false) {
-            this.x = x; this.y = y;
-            this.vx = (Math.random() - 0.5) * (isKinetic ? 40 : 20) * zoomScale;
-            this.vy = (Math.random() - 0.5) * (isKinetic ? 40 : 20) * zoomScale;
-            this.life = 1.0; 
-            this.size = (Math.random() * (isKinetic ? 60 : 30) + 10) * zoomScale;
-            this.color = color; this.zoomScale = zoomScale;
-        }
-        update() { this.x += this.vx; this.y += this.vy; this.life -= 0.02; this.size *= 0.98; }
-        draw() {
-            ctx.beginPath(); ctx.globalAlpha = this.life; ctx.fillStyle = this.color;
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
-        }
-    }
-
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles = particles.filter(p => p.life > 0);
-        particles.forEach(p => { p.update(); p.draw(); });
-        requestAnimationFrame(animate);
-    }
-    animate();
-
-    function handleTouchFire(e) {
-        if (e.cancelable) e.preventDefault();
-        ignite();
-    }
-
-    function ignite() {
-        const wpn = weapons[currentWpn];
-        const target = map.getCenter(); const screenPos = map.project(target);
-        const currentZoom = map.getZoom(); const zoomScale = Math.pow(2, currentZoom - 15);
-
-        speak("Удар подтвержден. Огонь.");
-
-        if (wpn.id === 'plasma') {
-            playSound('laser');
-            ctx.shadowBlur = 20; ctx.shadowColor = wpn.color;
-            ctx.strokeStyle = wpn.color; ctx.lineWidth = 10 * zoomScale;
-            ctx.beginPath(); ctx.moveTo(screenPos.x, 0); ctx.lineTo(screenPos.x, screenPos.y); ctx.stroke();
-            executeImpact(screenPos, wpn, target, currentZoom, zoomScale);
-        } else if (wpn.id === 'emp') {
-            playSound('emp');
-            executeImpact(screenPos, wpn, target, currentZoom, zoomScale * 3);
-            body.style.filter = "invert(1) brightness(2)";
-            setTimeout(() => body.style.filter = "none", 200);
-        } else if (wpn.id === 'swarm') {
-            for(let i=0; i<wpn.scatter; i++) {
-                setTimeout(() => {
-                    const off = (Math.random()-0.5) * 200;
-                    const offT = map.unproject([screenPos.x + off, screenPos.y + off]);
-                    playSound('click');
-                    executeImpact({x: screenPos.x + off, y: screenPos.y + off}, wpn, offT, currentZoom, zoomScale);
-                }, i * 150);
-            }
-        } else {
-            setTimeout(() => {
-                if(wpn.id === 'kinetic') playSound('kinetic');
-                executeImpact(screenPos, wpn, target, currentZoom, zoomScale);
-            }, wpn.delay);
-        }
-    }
-
-    function executeImpact(pos, wpn, geo, zoom, zScale) {
-        playSound('boom');
-        for(let i=0; i<40; i++) particles.push(new Particle(pos.x, pos.y, wpn.color, zScale, wpn.id === 'kinetic'));
-        body.style.filter = `brightness(2) contrast(2) saturate(0)`;
-        setTimeout(() => body.style.filter = "none", 150);
-    }
-
-    setInterval(() => {
-        document.getElementById('alt-val').innerText = (340 + Math.random()).toFixed(2) + " KM";
-    }, 1000);
-
     function updateBuildingHighlight() {
-        if (styleIndex === 2) return;
+        if (styleIndex === 2 || !map.isStyleLoaded()) return;
 
-        const features = map.queryRenderedFeatures([window.innerWidth/2, window.innerHeight/2]);
-        const building = features.find(f => f.layer.id.includes('building') || f.layer.type === 'fill-extrusion');
+        // Если слои пропали при смене тайлов, пересоздаем
+        if (!map.getLayer('3d-buildings-base')) setup3D();
+
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+
+        const features = map.queryRenderedFeatures([centerX, centerY], { 
+            layers: ['3d-buildings-base']
+        });
+
         const ch = document.getElementById('ch-ui');
 
-        if (building && building.id) {
-            if (lockedBuildingId !== building.id) {
-                if (lockedBuildingId !== null && currentLockedSource) {
-                    try {
-                        map.setFeatureState({ source: currentLockedSource.source, sourceLayer: currentLockedSource.sourceLayer, id: lockedBuildingId }, { locked: false });
-                    } catch(e) {}
-                }
-                lockedBuildingId = building.id;
-                currentLockedSource = { source: building.source, sourceLayer: building.sourceLayer };
-                
-                try {
-                    map.setFeatureState({ source: building.source, sourceLayer: building.sourceLayer, id: lockedBuildingId }, { locked: true });
-                } catch(e) {}
-                
-                playSound('click');
-                speak("Цель захвачена");
+        if (features.length > 0) {
+            const building = features[0];
+            const newId = building.id;
 
-                const layerId = building.layer.id;
-                if (map.getLayer(layerId)) {
-                    map.setPaintProperty(layerId, 'fill-extrusion-color', [
-                        'case',
-                        ['boolean', ['feature-state', 'locked'], false],
-                        '#ff3f34',
-                        '#aaa'
-                    ]);
-                }
+            if (lockedBuildingId !== newId) {
+                lockedBuildingId = newId;
+                // Применяем фильтр к слою подсветки
+                map.setFilter('3d-buildings-locked', ['==', ['id'], newId]);
+                
+                playSound('click'); 
+                speak("Цель захвачена");
+                ch.classList.add('locked');
             }
-            ch.classList.add('locked');
+            
             document.getElementById('lock-text').innerText = "TARGET ACQUIRED";
             document.getElementById('status-tag').innerText = "LOCKED";
-            document.getElementById('status-tag').style.color = "var(--danger)";
             document.getElementById('target-type').innerText = "STRUCTURE";
         } else {
-            if (lockedBuildingId !== null && currentLockedSource) {
-                try {
-                    map.setFeatureState({ source: currentLockedSource.source, sourceLayer: currentLockedSource.sourceLayer, id: lockedBuildingId }, { locked: false });
-                } catch(e) {}
+            if (lockedBuildingId !== null) {
                 lockedBuildingId = null;
+                map.setFilter('3d-buildings-locked', ['==', ['id'], '']);
+                ch.classList.remove('locked');
             }
-            ch.classList.remove('locked');
             document.getElementById('lock-text').innerText = "SCANNING...";
             document.getElementById('status-tag').innerText = "READY";
-            document.getElementById('status-tag').style.color = "var(--neon)";
             document.getElementById('target-type').innerText = "NULL";
         }
     }
 
+    let moveTimer = null;
     map.on('move', () => {
         const c = map.getCenter();
         document.getElementById('coords').innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
-        requestAnimationFrame(updateBuildingHighlight);
+        
+        if (!moveTimer) {
+            moveTimer = requestAnimationFrame(() => {
+                updateBuildingHighlight();
+                moveTimer = null;
+            });
+        }
     });
+
+    function ignite() {
+        const wpn = weapons[currentWpn];
+        const screenPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        speak("Удар!");
+        playSound(wpn.id === 'plasma' ? 'laser' : 'boom');
+        
+        if (wpn.id === 'plasma') {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = wpn.color;
+            ctx.strokeStyle = wpn.color; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.moveTo(screenPos.x, 0); ctx.lineTo(screenPos.x, screenPos.y); ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+        
+        for(let i=0; i<50; i++) {
+            particles.push({
+                x: screenPos.x, y: screenPos.y, 
+                vx: (Math.random()-0.5)*30, vy: (Math.random()-0.5)*30,
+                size: Math.random() * 8 + 2,
+                life: 1.0, color: wpn.color
+            });
+        }
+        body.style.filter = "brightness(3) contrast(1.2)"; 
+        setTimeout(() => body.style.filter = "none", 120);
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+                continue;
+            }
+            ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+        }
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+    function handleTouchFire(e) { 
+        if (e.cancelable) e.preventDefault(); 
+        ignite(); 
+    }
 
     window.addEventListener('resize', () => { 
         canvas.width = window.innerWidth; 
-        canvas.height = window.innerHeight;
-        map.resize();
+        canvas.height = window.innerHeight; 
+        map.resize(); 
     });
+    
     window.dispatchEvent(new Event('resize'));
+    
+    setInterval(() => {
+        document.getElementById('alt-val').innerText = (340 + Math.random() * 0.4).toFixed(2) + " KM";
+    }, 1500);
 </script>
 </body>
 </html>
