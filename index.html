@@ -2,85 +2,270 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>КИЕВ: ОПЕРАЦИЯ</title>
+    <title>КИЕВ: ОПЕРАЦИЯ • НЕЙРОННЫЙ ИНТЕРФЕЙС</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         :root {
             --neon: #32ff7e;
             --danger: #ff3f34;
             --warn: #ffaf40;
             --info: #00d2ff;
-            --bg-glass: rgba(5, 10, 8, 0.7);
+            --bg-glass: rgba(5, 10, 8, 0.8);
+            --grid-size: 60px;
         }
 
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%;
             background: #000; overflow: hidden; font-family: 'Courier New', monospace; 
-            color: var(--neon); -webkit-font-smoothing: antialiased; touch-action: none; 
+            color: var(--neon); -webkit-font-smoothing: antialiased; 
+            touch-action: none;
         }
         
         #map { 
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; 
-            filter: brightness(0.6) contrast(1.3) saturate(0.8); 
+            filter: brightness(0.65) contrast(1.35) saturate(0.9) hue-rotate(5deg);
+            transition: filter 0.3s ease;
         }
         
-        #canvas-fx { position: absolute; inset: 0; z-index: 150; pointer-events: none; }
-        .vignette { position: absolute; inset: 0; background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%); z-index: 110; pointer-events: none; }
-        .scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 50%, rgba(50, 255, 126, 0.03) 50%); background-size: 100% 4px; z-index: 120; pointer-events: none; }
-        .grid-ui { position: absolute; inset: 0; background-image: linear-gradient(rgba(50, 255, 126, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(50, 255, 126, 0.05) 1px, transparent 1px); background-size: 50px 50px; z-index: 105; pointer-events: none; }
-
-        .scanner-line {
-            position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--neon), transparent);
-            z-index: 130; top: 0; animation: scan 2.5s linear infinite; pointer-events: none; opacity: 0.3;
+        #canvas-fx { 
+            position: absolute; inset: 0; z-index: 150; 
+            pointer-events: none; 
         }
-        @keyframes scan { from { top: -5%; } to { top: 105%; } }
+        
+        .vignette { 
+            position: absolute; inset: 0; 
+            background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.85) 100%); 
+            z-index: 110; pointer-events: none; 
+            mix-blend-mode: multiply;
+        }
+        
+        .scanlines { 
+            position: absolute; inset: 0; 
+            background: repeating-linear-gradient(0deg, 
+                rgba(0, 0, 0, 0) 0px, 
+                rgba(0, 0, 0, 0) 2px, 
+                rgba(50, 255, 126, 0.06) 2px, 
+                rgba(50, 255, 126, 0.06) 4px);
+            background-size: 100% 4px;
+            z-index: 120; pointer-events: none; 
+            opacity: 0.8;
+        }
+        
+        .grid-ui { 
+            position: absolute; inset: 0; 
+            background-image: 
+                linear-gradient(rgba(50, 255, 126, 0.08) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(50, 255, 126, 0.08) 1px, transparent 1px); 
+            background-size: var(--grid-size) var(--grid-size); 
+            z-index: 105; pointer-events: none; 
+        }
+
+        .scanner-line, .scanner-line-secondary {
+            position: absolute; width: 100%; height: 3px; 
+            background: linear-gradient(90deg, transparent, var(--neon), var(--info), transparent);
+            z-index: 130; top: 0; 
+            animation: scan 3.2s linear infinite; 
+            pointer-events: none; 
+            opacity: 0.35;
+            filter: blur(0.7px);
+        }
+        .scanner-line-secondary {
+            background: linear-gradient(90deg, transparent, var(--danger), transparent);
+            opacity: 0.2;
+            animation: scan 2.4s linear infinite reverse;
+            height: 2px;
+        }
+        @keyframes scan { 
+            0% { top: -5%; } 
+            100% { top: 105%; } 
+        }
 
         .crosshair {
-            position: absolute; top: 50%; left: 50%; width: 280px; height: 280px;
+            position: absolute; top: 50%; left: 50%; width: 300px; height: 300px;
             transform: translate(-50%, -50%); z-index: 200; pointer-events: none;
-            transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            transition: all 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+            filter: drop-shadow(0 0 6px rgba(50,255,126,0.3));
         }
         
-        .ch-ring { position: absolute; inset: 0; border: 1px dashed var(--neon); border-radius: 50%; opacity: 0.2; animation: ch-rotate 15s linear infinite; }
-        .ch-ring-inner { position: absolute; inset: 40px; border: 2px solid var(--info); border-radius: 50%; opacity: 0.1; clip-path: polygon(0 0, 100% 0, 100% 30%, 0 30%); animation: ch-rotate 4s linear infinite reverse; }
-        .ch-ring-mid { position: absolute; inset: 20px; border: 1px double var(--warn); border-radius: 50%; opacity: 0.15; animation: ch-rotate 10s linear infinite; }
-        .ch-box { position: absolute; inset: 60px; border: 1px solid var(--neon); opacity: 0.2; animation: ch-rotate 8s linear infinite reverse; }
-        @keyframes ch-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .ch-ring { 
+            position: absolute; inset: 5px; border: 1px dashed var(--neon); border-radius: 50%; 
+            opacity: 0.3; animation: ch-rotate 22s linear infinite; 
+        }
+        .ch-ring-inner { 
+            position: absolute; inset: 45px; border: 2px solid var(--info); border-radius: 50%; 
+            opacity: 0.2; clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%); 
+            animation: ch-rotate 5s linear infinite reverse; 
+        }
+        .ch-ring-mid { 
+            position: absolute; inset: 25px; border: 1px double var(--warn); border-radius: 50%; 
+            opacity: 0.25; animation: ch-rotate 14s linear infinite; 
+        }
+        .ch-box { 
+            position: absolute; inset: 80px; border: 1px solid var(--neon); 
+            opacity: 0.2; animation: ch-rotate 12s linear infinite reverse; 
+        }
+        @keyframes ch-rotate { 
+            from { transform: rotate(0deg); } 
+            to { transform: rotate(360deg); } 
+        }
 
-        .ch-bracket { position: absolute; width: 40px; height: 40px; border: 1px solid var(--danger); transition: 0.3s; }
+        .ch-bracket { 
+            position: absolute; width: 45px; height: 45px; border: 2px solid var(--danger); 
+            transition: 0.2s; filter: drop-shadow(0 0 4px var(--danger));
+        }
         .br-tl { top: 0; left: 0; border-right: 0; border-bottom: 0; }
         .br-tr { top: 0; right: 0; border-left: 0; border-bottom: 0; }
         .br-bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
         .br-br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
 
-        .locked { width: 200px; height: 200px; }
-        .locked .ch-bracket { border-width: 4px; border-color: var(--neon); width: 60px; height: 60px; box-shadow: 0 0 20px var(--neon); }
-        .locked .ch-ring { opacity: 0.6; inset: -10px; border-style: solid; }
-        .locked-info { position: absolute; top: -50px; font-size: 10px; width: 100%; text-align: center; letter-spacing: 5px; color: var(--danger); transition: 0.3s; text-shadow: 0 0 5px var(--danger); }
-        .locked .locked-info { color: var(--neon); top: -65px; font-weight: bold; transform: scale(1.2); text-shadow: 0 0 10px var(--neon); }
+        .locked { 
+            width: 220px; height: 220px; 
+            filter: drop-shadow(0 0 20px var(--neon));
+        }
+        .locked .ch-bracket { 
+            border-width: 4px; border-color: var(--neon); width: 70px; height: 70px; 
+            box-shadow: 0 0 25px var(--neon); 
+        }
+        .locked .ch-ring { 
+            opacity: 0.8; inset: -12px; border-style: solid; border-color: var(--neon);
+            box-shadow: 0 0 30px rgba(50,255,126,0.5);
+        }
+        .locked-info { 
+            position: absolute; top: -55px; font-size: 11px; width: 100%; 
+            text-align: center; letter-spacing: 3px; color: var(--danger); 
+            transition: 0.3s; text-shadow: 0 0 8px var(--danger); 
+            font-weight: bold;
+        }
+        .locked .locked-info { 
+            color: var(--neon); top: -70px; font-size: 14px; 
+            text-shadow: 0 0 15px var(--neon); 
+        }
 
-        .data-stream { position: absolute; left: -110px; top: 50%; height: 100px; width: 90px; font-size: 8px; color: var(--neon); overflow: hidden; opacity: 0; transition: 0.3s; background: rgba(0,0,0,0.4); padding: 5px; border-left: 1px solid var(--neon); }
-        .locked .data-stream { opacity: 0.8; left: -140px; }
+        .data-stream { 
+            position: absolute; left: -140px; top: 50%; transform: translateY(-50%);
+            width: 110px; font-size: 9px; color: var(--neon); overflow: hidden; 
+            opacity: 0; transition: opacity 0.3s, left 0.3s; 
+            background: rgba(0,10,5,0.7); padding: 12px 8px; 
+            border-left: 2px solid var(--neon); 
+            border-radius: 4px 0 0 4px;
+            backdrop-filter: blur(1px);
+            box-shadow: -5px 0 15px rgba(0,0,0,0.7);
+            pointer-events: none;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+        .locked .data-stream { 
+            opacity: 1; 
+            left: -160px;
+        }
 
-        .top-bar { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; font-size: 10px; z-index: 300; pointer-events: none; border-bottom: 1px solid rgba(50, 255, 126, 0.2); background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent); padding: 5px; }
-        .controls-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 800px; display: flex; justify-content: space-between; align-items: center; z-index: 300; }
+        /* Убрана подложка, оставлен только текст */
+        .top-bar { 
+            position: absolute; top: 12px; left: 12px; right: 12px; 
+            display: flex; justify-content: space-between; font-size: 11px; 
+            z-index: 300; pointer-events: none; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--info);
+            text-shadow: 0 0 5px var(--info);
+            mix-blend-mode: screen;
+        }
+        .info-block {
+            display: flex; flex-direction: column;
+        }
+        .info-block div:first-child {
+            color: var(--neon);
+            margin-bottom: 3px;
+            text-shadow: 0 0 8px var(--neon);
+        }
 
-        .icon-btn { background: rgba(0,0,0,0.8); border: 1px solid var(--neon); color: var(--neon); width: 50px; height: 50px; cursor: pointer; transition: 0.2s; clip-path: polygon(20% 0%, 100% 0%, 80% 100%, 0% 100%); display: flex; align-items: center; justify-content: center; }
-        .icon-btn:hover { background: var(--neon); color: #000; box-shadow: 0 0 15px var(--neon); }
-        .fire-btn { width: 180px; height: 50px; background: rgba(255, 63, 52, 0.1); border: 2px solid var(--danger); color: var(--danger); cursor: pointer; font-family: inherit; font-weight: bold; letter-spacing: 3px; clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); transition: 0.2s; box-shadow: 0 0 10px rgba(255, 63, 52, 0.3); -webkit-tap-highlight-color: transparent; }
-        .fire-btn:active { background: var(--danger); color: #000; transform: scale(0.95); }
-        .weapon-label { font-size: 9px; position: absolute; bottom: -20px; width: 140px; text-align: center; left: -45px; color: var(--warn); text-transform: uppercase; font-weight: bold;}
+        .controls-container { 
+            position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); 
+            width: 92%; max-width: 820px; display: flex; 
+            justify-content: space-between; align-items: center; z-index: 300; 
+            gap: 10px;
+        }
 
-        .predator-glitch { animation: glitch-anim 0.4s steps(3); }
-        @keyframes glitch-anim { 0% { filter: contrast(3) hue-rotate(90deg); transform: skewX(10deg); } 33% { filter: brightness(4) invert(1); transform: skewX(-10deg); } 66% { filter: sepia(1) saturate(5); transform: scale(1.1); } 100% { filter: none; transform: none; } }
+        .icon-btn { 
+            background: rgba(0,0,0,0.7); border: 1.5px solid var(--neon); 
+            color: var(--neon); width: 60px; height: 60px; cursor: pointer; 
+            transition: 0.15s; 
+            clip-path: polygon(20% 0%, 100% 0%, 80% 100%, 0% 100%);
+            display: flex; align-items: center; justify-content: center; 
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 10px rgba(50,255,126,0.2);
+        }
+        .icon-btn:hover, .icon-btn:active { 
+            background: var(--neon); color: #000; 
+            box-shadow: 0 0 25px var(--neon); 
+            transform: scale(1.05);
+        }
+        .fire-btn { 
+            width: 220px; height: 60px; 
+            background: rgba(255, 63, 52, 0.15); 
+            border: 2px solid var(--danger); 
+            color: var(--danger); cursor: pointer; 
+            font-family: 'Courier New', monospace; 
+            font-weight: bold; letter-spacing: 4px; font-size: 1.1rem;
+            clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); 
+            transition: 0.15s; 
+            box-shadow: 0 0 20px rgba(255, 63, 52, 0.4); 
+            -webkit-tap-highlight-color: transparent;
+            backdrop-filter: blur(4px);
+            text-transform: uppercase;
+        }
+        .fire-btn:active { 
+            background: var(--danger); color: #000; 
+            transform: scale(0.94); 
+            box-shadow: 0 0 45px var(--danger);
+        }
+        .weapon-label { 
+            font-size: 10px; position: absolute; bottom: -22px; width: 140px; 
+            text-align: center; left: -45px; color: var(--warn); 
+            text-transform: uppercase; font-weight: bold; 
+            text-shadow: 0 0 5px var(--warn);
+            letter-spacing: 1px;
+        }
+
+        .predator-glitch {
+            animation: glitch-anim 0.45s steps(2) forwards;
+        }
+        @keyframes glitch-anim { 
+            0% { filter: contrast(3) hue-rotate(90deg) brightness(1.5); transform: skewX(8deg); } 
+            20% { filter: brightness(3) invert(0.8); transform: skewX(-8deg); } 
+            40% { filter: sepia(1) saturate(7); transform: scale(1.02); } 
+            60% { filter: hue-rotate(180deg) contrast(2); } 
+            100% { filter: none; transform: none; } 
+        }
+
+        .pulse-dot {
+            display: inline-block; width: 8px; height: 8px; background: var(--neon); 
+            border-radius: 50%; margin-left: 5px; animation: pulse 1s infinite;
+            box-shadow: 0 0 8px var(--neon);
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        @media (max-width: 600px) {
+            .crosshair { width: 240px; height: 240px; }
+            .locked { width: 180px; height: 180px; }
+            .data-stream { left: -115px; width: 90px; font-size: 8px; padding: 8px; }
+            .locked .data-stream { left: -125px; }
+            .fire-btn { width: 160px; height: 50px; font-size: 0.9rem; letter-spacing: 2px; }
+            .icon-btn { width: 50px; height: 50px; }
+        }
     </style>
 </head>
 <body id="main-body">
 
 <div class="grid-ui"></div>
 <div class="scanner-line"></div>
+<div class="scanner-line-secondary"></div>
 <canvas id="canvas-fx"></canvas>
 <div id="map"></div>
 <div class="vignette"></div>
@@ -88,19 +273,21 @@
 
 <div class="top-bar">
     <div class="info-block">
-        <div>SAT_ID: ORBITAL-V</div>
-        <div>COORD: <span id="coords">30.52, 50.45</span></div>
+        <div>SAT_ID: ORBITAL-V <span class="pulse-dot"></span></div>
+        <div>COORD: <span id="coords">30.5234, 50.4501</span></div>
     </div>
-    <div style="text-align: center; color: var(--info)">[ OPERATIONAL NEURAL LINK ]</div>
+    <div style="text-align: center; color: var(--info)">[ НЕЙРОННЫЙ ИНТЕРФЕЙС ]</div>
     <div class="info-block" style="text-align: right;">
         <div>ALT: <span id="alt-val">340.22 KM</span></div>
-        <div>SYS: <span id="status-tag">STANDBY</span></div>
+        <div>SYS: <span id="status-tag">ГОТОВ</span></div>
     </div>
 </div>
 
 <div class="crosshair" id="ch-ui">
-    <div class="locked-info" id="lock-text">SCANNING...</div>
-    <div class="data-stream">VEL_X: 7.6<br>HDG: 21.0<br>DIST: 402<br>TMP: -40C<br>RAD: 0.12<br>TRG: <span id="target-type">NULL</span></div>
+    <div class="locked-info" id="lock-text">СКАНИРОВАНИЕ...</div>
+    <div class="data-stream" id="data-stream">
+        VEL_X: 7.6<br>HDG: 21.0<br>DIST: 402<br>TMP: -40C<br>RAD: 0.12<br>TRG: <span id="target-type">NULL</span>
+    </div>
     <div class="ch-ring"></div><div class="ch-ring-inner"></div><div class="ch-ring-mid"></div>
     <div class="ch-bracket br-tl"></div><div class="ch-bracket br-tr"></div>
     <div class="ch-bracket br-bl"></div><div class="ch-bracket br-br"></div>
@@ -108,275 +295,455 @@
 </div>
 
 <div class="controls-container">
-    <button class="icon-btn" onclick="cycleStyles();">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+    <button class="icon-btn" id="styleBtn" aria-label="Сменить карту">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
     </button>
-    <button class="fire-btn" onmousedown="ignite()" ontouchstart="handleTouchFire(event)">LAUNCH ATTACK</button>
+    
+    <button class="fire-btn" id="fireBtn">LAUNCH ATTACK</button>
+    
     <div style="position:relative">
-        <button class="icon-btn" onclick="cycleWeapons();">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M14.5 18l-2.5 2.5-2.5-2.5 1.4-1.4 1.1 1.1 1.1-1.1 1.4 1.4zM7 6c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v2H7V6z"/></svg>
+        <button class="icon-btn" id="weaponBtn">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M14.5 18l-2.5 2.5-2.5-2.5 1.4-1.4 1.1 1.1 1.1-1.1 1.4 1.4zM7 6c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v2H7V6z"/></svg>
         </button>
-        <div class="weapon-label" id="weapon-btn-label">WPN: PLASMA</div>
+        <div class="weapon-label" id="weapon-btn-label">WPN: ПЛАЗМА</div>
     </div>
 </div>
 
 <script>
-    const synth = window.speechSynthesis;
-    let femaleVoice = null;
-    function initVoices() {
-        const voices = synth.getVoices();
-        femaleVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('female') || v.name.includes('Google') || v.name.includes('Irina'))) || voices[0];
-    }
-    if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = initVoices;
+    (function() {
+        // ================== ИНИЦИАЛИЗАЦИЯ АУДИО И ГОЛОСА ==================
+        const synth = window.speechSynthesis;
+        let femaleVoice = null;
 
-    function speak(text) {
-        if (synth.speaking) synth.cancel();
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.voice = femaleVoice; utter.pitch = 0.8; utter.rate = 1.1;
-        synth.speak(utter);
-    }
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playSound(type) {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const gain = audioCtx.createGain(); gain.connect(audioCtx.destination);
-        const osc = audioCtx.createOscillator(); osc.connect(gain);
-        if (type === 'click') { 
-            osc.type = 'square'; osc.frequency.setValueAtTime(1000, audioCtx.currentTime); 
-            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1); 
-            gain.gain.setValueAtTime(0.05, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-        } else if (type === 'laser') { 
-            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(2000, audioCtx.currentTime); 
-            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5); 
-            gain.gain.setValueAtTime(0.2, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.5);
-        } else if (type === 'emp') { 
-            osc.type = 'triangle'; osc.frequency.setValueAtTime(100, audioCtx.currentTime); 
-            osc.frequency.setValueAtTime(3000, audioCtx.currentTime + 0.1); 
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
-        } else if (type === 'boom') {
-            const noise = audioCtx.createBufferSource(); 
-            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate); 
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < audioCtx.sampleRate; i++) data[i] = Math.random() * 2 - 1;
-            noise.buffer = buffer; 
-            const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.setValueAtTime(400, audioCtx.currentTime);
-            noise.connect(filter); filter.connect(gain); gain.gain.setValueAtTime(0.8, audioCtx.currentTime); 
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5); noise.start(); noise.stop(audioCtx.currentTime + 1.5);
+        function initVoices() {
+            const voices = synth.getVoices();
+            femaleVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Milena') || v.name.includes('Irina') || v.name.includes('Google') || v.name.includes('female'))) || voices[0];
         }
-    }
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = initVoices;
+        } else {
+            setTimeout(initVoices, 100);
+        }
 
-    let currentWpn = 0;
-    const weapons = [
-        { id: 'plasma', name: 'PLASMA CANNON', voice: 'Плазменная пушка выбрана', color: '#32ff7e', sound: 'laser' },
-        { id: 'missile', name: 'HELLFIRE V2', voice: 'Ракеты Хэлфайер активны', color: '#ff3f34', sound: 'click' },
-        { id: 'swarm', name: 'DRONE SWARM', voice: 'Рой дронов готов', color: '#ffaf40', sound: 'click' }
-    ];
+        function speak(text) {
+            if (!synth) return;
+            if (synth.speaking) synth.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.voice = femaleVoice; 
+            utter.pitch = 0.75; 
+            utter.rate = 1.0;
+            utter.lang = 'ru-RU';
+            synth.speak(utter);
+        }
 
-    function cycleWeapons() {
-        playSound('click'); currentWpn = (currentWpn + 1) % weapons.length;
-        document.getElementById('weapon-btn-label').innerText = "WPN: " + weapons[currentWpn].name;
-        document.getElementById('weapon-btn-label').style.color = weapons[currentWpn].color;
-        speak(weapons[currentWpn].voice);
-    }
-
-    const canvas = document.getElementById('canvas-fx');
-    const ctx = canvas.getContext('2d');
-    const body = document.getElementById('main-body');
-    let particles = [];
-    let styleIndex = 0;
-    let lockedBuildingId = null;
-
-    const styles = [
-        { name: 'Темный режим', url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' },
-        { name: 'Светлый режим', url: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json' },
-        { name: 'Спутник', url: { "version": 8, "sources": {"osm": {"type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256}}, "layers": [{"id": "osm", "type": "raster", "source": "osm"}]}}
-    ];
-
-    const map = new maplibregl.Map({
-        container: 'map', 
-        style: styles[0].url, 
-        center: [30.5234, 50.4501], 
-        zoom: 16.5, 
-        pitch: 60, 
-        bearing: -20, 
-        antialias: true, 
-        attributionControl: false,
-        maxPitch: 85
-    });
-
-    function setup3D() {
-        if (styleIndex === 2 || !map.isStyleLoaded()) return; 
-        
-        const style = map.getStyle();
-        const sourceId = style.sources['carto'] ? 'carto' : (style.sources['openmaptiles'] ? 'openmaptiles' : null);
-        
-        if (!sourceId) return;
-
-        const labelLayer = style.layers.find(l => l.type === 'symbol');
-
-        // Слой для обычных зданий (всегда отрисовываются)
-        if (!map.getLayer('3d-buildings-base')) {
-            map.addLayer({
-                'id': '3d-buildings-base',
-                'source': sourceId,
-                'source-layer': 'building',
-                'type': 'fill-extrusion',
-                'minzoom': 14,
-                'paint': {
-                    'fill-extrusion-color': '#333',
-                    'fill-extrusion-height': ['get', 'render_height'],
-                    'fill-extrusion-base': ['get', 'render_min_height'],
-                    'fill-extrusion-opacity': 0.8
+        const AudioManager = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
                 }
-            }, labelLayer ? labelLayer.id : null);
-        }
-
-        // Слой для подсвеченного здания
-        if (!map.getLayer('3d-buildings-locked')) {
-            map.addLayer({
-                'id': '3d-buildings-locked',
-                'source': sourceId,
-                'source-layer': 'building',
-                'type': 'fill-extrusion',
-                'minzoom': 14,
-                'filter': ['==', ['id'], ''], // Изначально фильтр пустой
-                'paint': {
-                    'fill-extrusion-color': '#ff3f34',
-                    'fill-extrusion-height': ['get', 'render_height'],
-                    'fill-extrusion-base': ['get', 'render_min_height'],
-                    'fill-extrusion-opacity': 1.0
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
                 }
-            }, labelLayer ? labelLayer.id : null);
-        }
-    }
+                return this.ctx;
+            },
+            play(type) {
+                const ctx = this.init();
+                const masterGain = ctx.createGain();
+                masterGain.connect(ctx.destination);
+                masterGain.gain.setValueAtTime(0.3, ctx.currentTime);
 
-    map.on('load', setup3D);
-    map.on('styledata', setup3D);
+                if (type === 'click') {
+                    const osc = ctx.createOscillator();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(1100, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.12);
+                    osc.connect(masterGain);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.12);
+                } else if (type === 'laser') {
+                    const osc = ctx.createOscillator();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(1800, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.5);
+                    osc.connect(masterGain);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.5);
+                } else if (type === 'emp') {
+                    const osc1 = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    osc1.type = 'triangle'; osc2.type = 'sine';
+                    osc1.frequency.setValueAtTime(100, ctx.currentTime);
+                    osc1.frequency.setValueAtTime(2800, ctx.currentTime + 0.1);
+                    osc2.frequency.setValueAtTime(150, ctx.currentTime);
+                    osc2.frequency.setValueAtTime(3200, ctx.currentTime + 0.12);
+                    osc1.connect(masterGain); osc2.connect(masterGain);
+                    osc1.start(); osc2.start();
+                    osc1.stop(ctx.currentTime + 0.2); osc2.stop(ctx.currentTime + 0.2);
+                } else if (type === 'boom') {
+                    const bufferSize = ctx.sampleRate * 0.5;
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(200, ctx.currentTime);
+                    filter.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.7);
+                    noise.connect(filter);
+                    filter.connect(masterGain);
+                    masterGain.gain.setValueAtTime(0.7, ctx.currentTime);
+                    masterGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
+                    noise.start();
+                    noise.stop(ctx.currentTime + 1.2);
+                }
+            }
+        };
 
-    function cycleStyles() {
-        body.classList.add('predator-glitch'); playSound('emp');
-        styleIndex = (styleIndex + 1) % styles.length;
-        lockedBuildingId = null;
-        map.setStyle(styles[styleIndex].url);
-        speak("Смена режима: " + styles[styleIndex].name);
-        setTimeout(() => body.classList.remove('predator-glitch'), 400);
-    }
+        // ================== СОСТОЯНИЕ ==================
+        let currentWpn = 0;
+        const weapons = [
+            { id: 'plasma', name: 'ПЛАЗМА', fullName: 'ПЛАЗМЕННАЯ ПУШКА', voice: 'Плазменная пушка выбрана', color: '#32ff7e', sound: 'laser' },
+            { id: 'missile', name: 'РАКЕТЫ', fullName: 'HELLFIRE V2', voice: 'Ракеты Хэлфайер активны', color: '#ff3f34', sound: 'boom' },
+            { id: 'swarm', name: 'РОЙ', fullName: 'DRONE SWARM', voice: 'Рой дронов готов', color: '#ffaf40', sound: 'click' }
+        ];
 
-    function updateBuildingHighlight() {
-        if (styleIndex === 2 || !map.isStyleLoaded()) return;
+        const body = document.body;
+        const canvas = document.getElementById('canvas-fx');
+        const ctx = canvas.getContext('2d');
+        const chUI = document.getElementById('ch-ui');
+        const lockText = document.getElementById('lock-text');
+        const statusTag = document.getElementById('status-tag');
+        const targetTypeSpan = document.getElementById('target-type');
+        const weaponLabel = document.getElementById('weapon-btn-label');
+        const coordsSpan = document.getElementById('coords');
+        const altSpan = document.getElementById('alt-val');
 
-        // Если слои пропали при смене тайлов, пересоздаем
-        if (!map.getLayer('3d-buildings-base')) setup3D();
+        // ================== КАРТА И 3D ==================
+        const styles = [
+            { name: 'Темный', url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' },
+            { name: 'Светлый', url: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json' },
+            { name: 'Спутник', url: { version: 8, sources: { osm: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] } }
+        ];
 
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2;
-
-        const features = map.queryRenderedFeatures([centerX, centerY], { 
-            layers: ['3d-buildings-base']
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: styles[0].url,
+            center: [30.5234, 50.4501],
+            zoom: 16.7,
+            pitch: 65,
+            bearing: -15,
+            antialias: true,
+            attributionControl: false,
+            maxPitch: 85,
+            fadeDuration: 50
         });
 
-        const ch = document.getElementById('ch-ui');
+        let styleIndex = 0;
+        let lockedBuildingId = null;
+        let moveTimer = null;
 
-        if (features.length > 0) {
-            const building = features[0];
-            const newId = building.id;
+        function setup3D() {
+            if (styleIndex === 2 || !map.isStyleLoaded()) return;
 
-            if (lockedBuildingId !== newId) {
-                lockedBuildingId = newId;
-                // Применяем фильтр к слою подсветки
-                map.setFilter('3d-buildings-locked', ['==', ['id'], newId]);
-                
-                playSound('click'); 
-                speak("Цель захвачена");
-                ch.classList.add('locked');
+            const style = map.getStyle();
+            const sourceId = style.sources['carto'] ? 'carto' : (style.sources['openmaptiles'] ? 'openmaptiles' : null);
+            if (!sourceId) return;
+
+            const labelLayer = style.layers.find(l => l.type === 'symbol');
+
+            if (!map.getLayer('3d-buildings-base')) {
+                map.addLayer({
+                    id: '3d-buildings-base',
+                    source: sourceId,
+                    'source-layer': 'building',
+                    type: 'fill-extrusion',
+                    minzoom: 14,
+                    paint: {
+                        'fill-extrusion-color': '#334433',
+                        'fill-extrusion-height': ['get', 'render_height'],
+                        'fill-extrusion-base': ['get', 'render_min_height'],
+                        'fill-extrusion-opacity': 0.75
+                    }
+                }, labelLayer ? labelLayer.id : null);
             }
+
+            if (!map.getLayer('3d-buildings-locked')) {
+                map.addLayer({
+                    id: '3d-buildings-locked',
+                    source: sourceId,
+                    'source-layer': 'building',
+                    type: 'fill-extrusion',
+                    minzoom: 14,
+                    filter: ['==', ['id'], ''],
+                    paint: {
+                        'fill-extrusion-color': '#ff3f34',
+                        'fill-extrusion-height': ['get', 'render_height'],
+                        'fill-extrusion-base': ['get', 'render_min_height'],
+                        'fill-extrusion-opacity': 1.0
+                    }
+                }, labelLayer ? labelLayer.id : null);
+            }
+        }
+
+        map.on('load', setup3D);
+        map.on('styledata', setup3D);
+
+        // ================== УЛУЧШЕННАЯ ПРОВЕРКА ПОПАДАНИЯ В ПРИЦЕЛ ==================
+        function getCrosshairBBox() {
+            const ch = document.getElementById('ch-ui');
+            const rect = ch.getBoundingClientRect();
             
-            document.getElementById('lock-text').innerText = "TARGET ACQUIRED";
-            document.getElementById('status-tag').innerText = "LOCKED";
-            document.getElementById('target-type').innerText = "STRUCTURE";
-        } else {
-            if (lockedBuildingId !== null) {
-                lockedBuildingId = null;
-                map.setFilter('3d-buildings-locked', ['==', ['id'], '']);
-                ch.classList.remove('locked');
+            // Добавляем небольшой допуск для улучшения захвата на разных зумах
+            const tolerance = Math.min(rect.width * 0.02, 5);
+            
+            return {
+                left: rect.left - tolerance,
+                top: rect.top - tolerance,
+                right: rect.right + tolerance,
+                bottom: rect.bottom + tolerance,
+                width: rect.width,
+                height: rect.height
+            };
+        }
+
+        function isPointInBBox(point, bbox) {
+            return point.x >= bbox.left && 
+                   point.x <= bbox.right && 
+                   point.y >= bbox.top && 
+                   point.y <= bbox.bottom;
+        }
+
+        function checkBuildingPoints(feature, bbox) {
+            if (!feature || !feature.geometry) return false;
+            
+            try {
+                const coordinates = feature.geometry.coordinates;
+                
+                // Функция для преобразования координат и проверки точки
+                const checkPoint = (point) => {
+                    if (!point || point.length < 2) return false;
+                    const screenPoint = map.project([point[0], point[1]]);
+                    return isPointInBBox(screenPoint, bbox);
+                };
+                
+                // Рекурсивная проверка всех точек в геометрии
+                const checkAllPoints = (coords) => {
+                    if (typeof coords[0] === 'number') {
+                        return checkPoint(coords);
+                    } else {
+                        for (const item of coords) {
+                            if (!checkAllPoints(item)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                };
+                
+                // Проверяем каждый полигон
+                for (const coordSet of coordinates) {
+                    if (!checkAllPoints(coordSet)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            } catch (e) {
+                console.warn('Error checking building:', e);
+                return false;
             }
-            document.getElementById('lock-text').innerText = "SCANNING...";
-            document.getElementById('status-tag').innerText = "READY";
-            document.getElementById('target-type').innerText = "NULL";
         }
-    }
 
-    let moveTimer = null;
-    map.on('move', () => {
-        const c = map.getCenter();
-        document.getElementById('coords').innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
-        
-        if (!moveTimer) {
-            moveTimer = requestAnimationFrame(() => {
-                updateBuildingHighlight();
-                moveTimer = null;
-            });
-        }
-    });
+        function updateBuildingHighlight() {
+            if (styleIndex === 2 || !map.isStyleLoaded()) return;
 
-    function ignite() {
-        const wpn = weapons[currentWpn];
-        const screenPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-        speak("Удар!");
-        playSound(wpn.id === 'plasma' ? 'laser' : 'boom');
-        
-        if (wpn.id === 'plasma') {
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = wpn.color;
-            ctx.strokeStyle = wpn.color; ctx.lineWidth = 6;
-            ctx.beginPath(); ctx.moveTo(screenPos.x, 0); ctx.lineTo(screenPos.x, screenPos.y); ctx.stroke();
-            ctx.shadowBlur = 0;
-        }
-        
-        for(let i=0; i<50; i++) {
-            particles.push({
-                x: screenPos.x, y: screenPos.y, 
-                vx: (Math.random()-0.5)*30, vy: (Math.random()-0.5)*30,
-                size: Math.random() * 8 + 2,
-                life: 1.0, color: wpn.color
-            });
-        }
-        body.style.filter = "brightness(3) contrast(1.2)"; 
-        setTimeout(() => body.style.filter = "none", 120);
-    }
+            if (!map.getLayer('3d-buildings-base')) setup3D();
 
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-            if (p.life <= 0) {
-                particles.splice(i, 1);
-                continue;
+            const bbox = getCrosshairBBox();
+            
+            // Получаем все здания в области прицела с запасом
+            const features = map.queryRenderedFeatures(
+                [
+                    [bbox.left - 10, bbox.top - 10],
+                    [bbox.right + 10, bbox.bottom + 10]
+                ], 
+                { layers: ['3d-buildings-base'] }
+            );
+
+            // Находим первое здание, все точки которого попадают в прицел
+            let targetBuilding = null;
+            for (const feature of features) {
+                if (checkBuildingPoints(feature, bbox)) {
+                    targetBuilding = feature;
+                    break;
+                }
             }
-            ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+
+            if (targetBuilding) {
+                const newId = targetBuilding.id;
+
+                if (lockedBuildingId !== newId) {
+                    lockedBuildingId = newId;
+                    if (map.getLayer('3d-buildings-locked')) {
+                        map.setFilter('3d-buildings-locked', ['==', ['id'], newId]);
+                    }
+                    AudioManager.play('click');
+                    speak('Цель захвачена');
+                    chUI.classList.add('locked');
+                }
+
+                lockText.innerText = 'ЦЕЛЬ ЗАХВАЧЕНА';
+                statusTag.innerText = 'LOCK';
+                targetTypeSpan.innerText = 'ЗДАНИЕ';
+            } else {
+                if (lockedBuildingId !== null) {
+                    lockedBuildingId = null;
+                    if (map.getLayer('3d-buildings-locked')) {
+                        map.setFilter('3d-buildings-locked', ['==', ['id'], '']);
+                    }
+                    chUI.classList.remove('locked');
+                }
+                lockText.innerText = 'СКАНИРОВАНИЕ...';
+                statusTag.innerText = 'ГОТОВ';
+                targetTypeSpan.innerText = 'N/A';
+            }
         }
-        requestAnimationFrame(animate);
-    }
-    animate();
 
-    function handleTouchFire(e) { 
-        if (e.cancelable) e.preventDefault(); 
-        ignite(); 
-    }
+        map.on('move', () => {
+            const c = map.getCenter();
+            coordsSpan.innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
 
-    window.addEventListener('resize', () => { 
-        canvas.width = window.innerWidth; 
-        canvas.height = window.innerHeight; 
-        map.resize(); 
-    });
-    
-    window.dispatchEvent(new Event('resize'));
-    
-    setInterval(() => {
-        document.getElementById('alt-val').innerText = (340 + Math.random() * 0.4).toFixed(2) + " KM";
-    }, 1500);
+            if (!moveTimer) {
+                moveTimer = requestAnimationFrame(() => {
+                    updateBuildingHighlight();
+                    moveTimer = null;
+                });
+            }
+        });
+
+        // Дополнительная проверка при изменении зума
+        map.on('zoom', () => {
+            if (!moveTimer) {
+                moveTimer = requestAnimationFrame(() => {
+                    updateBuildingHighlight();
+                    moveTimer = null;
+                });
+            }
+        });
+
+        // ================== ЭФФЕКТЫ ==================
+        let particles = [];
+
+        function ignite() {
+            const wpn = weapons[currentWpn];
+            const screenPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+            speak('Удар!');
+            AudioManager.play(wpn.sound);
+
+            if (wpn.id === 'plasma') {
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = wpn.color;
+                ctx.strokeStyle = wpn.color;
+                ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.moveTo(screenPos.x, 0);
+                ctx.lineTo(screenPos.x, screenPos.y - 20);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            for (let i = 0; i < 55; i++) {
+                particles.push({
+                    x: screenPos.x + (Math.random() - 0.5) * 40,
+                    y: screenPos.y + (Math.random() - 0.5) * 40,
+                    vx: (Math.random() - 0.5) * 28,
+                    vy: (Math.random() - 0.5) * 28,
+                    size: Math.random() * 10 + 3,
+                    life: 1.0,
+                    color: wpn.color
+                });
+            }
+
+            body.style.filter = "brightness(2.5) contrast(1.3)";
+            setTimeout(() => body.style.filter = "none", 180);
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.025;
+                if (p.life <= 0 || p.y < 0 || p.x < 0 || p.x > canvas.width) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // ================== УПРАВЛЕНИЕ ==================
+        function cycleStyles() {
+            body.classList.add('predator-glitch');
+            AudioManager.play('emp');
+            styleIndex = (styleIndex + 1) % styles.length;
+            lockedBuildingId = null;
+            map.setStyle(styles[styleIndex].url);
+            speak('Режим: ' + styles[styleIndex].name);
+            setTimeout(() => body.classList.remove('predator-glitch'), 500);
+        }
+
+        function cycleWeapons() {
+            AudioManager.play('click');
+            currentWpn = (currentWpn + 1) % weapons.length;
+            weaponLabel.innerText = 'WPN: ' + weapons[currentWpn].name;
+            weaponLabel.style.color = weapons[currentWpn].color;
+            speak(weapons[currentWpn].voice);
+        }
+
+        document.getElementById('styleBtn').addEventListener('click', cycleStyles);
+        document.getElementById('weaponBtn').addEventListener('click', cycleWeapons);
+        const fireBtn = document.getElementById('fireBtn');
+        fireBtn.addEventListener('click', ignite);
+        fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ignite(); });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            map.resize();
+            setTimeout(updateBuildingHighlight, 100);
+        });
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        setInterval(() => {
+            altSpan.innerText = (340 + Math.random() * 0.6).toFixed(2) + ' KM';
+        }, 1800);
+
+        function unlockAudio() {
+            AudioManager.init();
+            document.removeEventListener('touchstart', unlockAudio);
+            document.removeEventListener('click', unlockAudio);
+        }
+        document.addEventListener('touchstart', unlockAudio);
+        document.addEventListener('click', unlockAudio);
+
+        setTimeout(() => {
+            speak('Система активирована. Киев, операция.');
+        }, 1000);
+    })();
 </script>
 </body>
 </html>
