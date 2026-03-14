@@ -165,7 +165,6 @@
             left: -160px;
         }
 
-        /* Убрана подложка, оставлен только текст */
         .top-bar { 
             position: absolute; top: 12px; left: 12px; right: 12px; 
             display: flex; justify-content: space-between; font-size: 11px; 
@@ -443,8 +442,8 @@
         });
 
         let styleIndex = 0;
-        let lockedBuildingId = null;
-        let moveTimer = null;
+        let lockedBuildingIds = new Set(); 
+        let buildingSigs = new Map(); // Хранилище: ID -> {floors, entities}
 
         function setup3D() {
             if (styleIndex === 2 || !map.isStyleLoaded()) return;
@@ -478,228 +477,269 @@
                     'source-layer': 'building',
                     type: 'fill-extrusion',
                     minzoom: 14,
-                    filter: ['==', ['id'], ''],
+                    filter: ['in', ['id'], ['literal', []]], 
                     paint: {
                         'fill-extrusion-color': '#ff3f34',
                         'fill-extrusion-height': ['get', 'render_height'],
                         'fill-extrusion-base': ['get', 'render_min_height'],
-                        'fill-extrusion-opacity': 1.0
+                        'fill-extrusion-opacity': 0.15 
                     }
                 }, labelLayer ? labelLayer.id : null);
+            }
+
+            if (!map.getLayer('3d-buildings-wireframe')) {
+                map.addLayer({
+                    id: '3d-buildings-wireframe',
+                    source: sourceId,
+                    'source-layer': 'building',
+                    type: 'line',
+                    minzoom: 14,
+                    filter: ['in', ['id'], ['literal', []]],
+                    paint: {
+                        'line-color': '#ff3f34',
+                        'line-width': 1.5,
+                        'line-opacity': 0.6
+                    }
+                });
             }
         }
 
         map.on('load', setup3D);
         map.on('styledata', setup3D);
 
-        // ================== УЛУЧШЕННАЯ ПРОВЕРКА ПОПАДАНИЯ В ПРИЦЕЛ ==================
         function getCrosshairBBox() {
             const ch = document.getElementById('ch-ui');
             const rect = ch.getBoundingClientRect();
-            
-            // Добавляем небольшой допуск для улучшения захвата на разных зумах
-            const tolerance = Math.min(rect.width * 0.02, 5);
-            
+            const pad = 45; 
             return {
-                left: rect.left - tolerance,
-                top: rect.top - tolerance,
-                right: rect.right + tolerance,
-                bottom: rect.bottom + tolerance,
-                width: rect.width,
-                height: rect.height
+                left: rect.left + pad,
+                top: rect.top + pad,
+                right: rect.right - pad,
+                bottom: rect.bottom - pad
             };
         }
 
-        function isPointInBBox(point, bbox) {
-            return point.x >= bbox.left && 
-                   point.x <= bbox.right && 
-                   point.y >= bbox.top && 
-                   point.y <= bbox.bottom;
-        }
-
-        function checkBuildingPoints(feature, bbox) {
+        function isAnyPartOfBuildingInside(feature, bbox) {
             if (!feature || !feature.geometry) return false;
-            
             try {
                 const coordinates = feature.geometry.coordinates;
-                
-                // Функция для преобразования координат и проверки точки
-                const checkPoint = (point) => {
-                    if (!point || point.length < 2) return false;
-                    const screenPoint = map.project([point[0], point[1]]);
-                    return isPointInBBox(screenPoint, bbox);
-                };
-                
-                // Рекурсивная проверка всех точек в геометрии
-                const checkAllPoints = (coords) => {
+                let found = false;
+                const checkPoints = (coords) => {
+                    if (found) return;
                     if (typeof coords[0] === 'number') {
-                        return checkPoint(coords);
+                        const screenPoint = map.project([coords[0], coords[1]]);
+                        if (screenPoint.x >= bbox.left && screenPoint.x <= bbox.right &&
+                            screenPoint.y >= bbox.top && screenPoint.y <= bbox.bottom) {
+                            found = true;
+                        }
                     } else {
                         for (const item of coords) {
-                            if (!checkAllPoints(item)) {
-                                return false;
-                            }
+                            checkPoints(item);
+                            if (found) break;
                         }
-                        return true;
                     }
                 };
-                
-                // Проверяем каждый полигон
-                for (const coordSet of coordinates) {
-                    if (!checkAllPoints(coordSet)) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            } catch (e) {
-                console.warn('Error checking building:', e);
-                return false;
-            }
+                checkPoints(coordinates);
+                return found;
+            } catch (e) { return false; }
         }
 
         function updateBuildingHighlight() {
             if (styleIndex === 2 || !map.isStyleLoaded()) return;
-
             if (!map.getLayer('3d-buildings-base')) setup3D();
 
             const bbox = getCrosshairBBox();
+            const allFeatures = map.queryRenderedFeatures({ layers: ['3d-buildings-base'] });
+
+            const newLockedSet = new Set();
+            const newLockedFeatures = [];
+
+            for (const feature of allFeatures) {
+                if (isAnyPartOfBuildingInside(feature, bbox)) {
+                    newLockedSet.add(feature.id);
+                    newLockedFeatures.push(feature);
+                    
+                    // ЕСЛИ ЭТО НОВОЕ ЗДАНИЕ - ГЕНЕРИРУЕМ ЕГО ОДИН РАЗ И ПРИВЯЗЫВАЕМ К ID
+                    if (!buildingSigs.has(feature.id)) {
+                        const height = feature.properties.render_height || 30;
+                        const floorsCount = Math.floor(height / 3.5); 
+                        const entities = [];
+                        
+                        const peopleCount = 2 + Math.floor(Math.random() * 6);
+                        for(let i=0; i < peopleCount; i++) {
+                            entities.push({
+                                floor: Math.floor(Math.random() * floorsCount),
+                                relX: 0.15 + Math.random() * 0.7,
+                                relY: 0.15 + Math.random() * 0.7,
+                                pulse: Math.random() * Math.PI,
+                                phase: Math.random() * 10
+                            });
+                        }
+                        buildingSigs.set(feature.id, { 
+                            floors: floorsCount, 
+                            entities, 
+                            scanProgress: 0 
+                        });
+                    }
+                }
+            }
+
+            const oldIdsArray = Array.from(lockedBuildingIds);
+            const newIdsArray = Array.from(newLockedSet);
             
-            // Получаем все здания в области прицела с запасом
-            const features = map.queryRenderedFeatures(
-                [
-                    [bbox.left - 10, bbox.top - 10],
-                    [bbox.right + 10, bbox.bottom + 10]
-                ], 
-                { layers: ['3d-buildings-base'] }
-            );
+            const changed = oldIdsArray.length !== newIdsArray.length || 
+                           oldIdsArray.some(id => !newLockedSet.has(id));
 
-            // Находим первое здание, все точки которого попадают в прицел
-            let targetBuilding = null;
-            for (const feature of features) {
-                if (checkBuildingPoints(feature, bbox)) {
-                    targetBuilding = feature;
-                    break;
-                }
-            }
+            if (changed) {
+                lockedBuildingIds = newLockedSet;
+                const filter = ['in', ['id'], ['literal', newIdsArray]];
+                if (map.getLayer('3d-buildings-locked')) map.setFilter('3d-buildings-locked', filter);
+                if (map.getLayer('3d-buildings-wireframe')) map.setFilter('3d-buildings-wireframe', filter);
 
-            if (targetBuilding) {
-                const newId = targetBuilding.id;
-
-                if (lockedBuildingId !== newId) {
-                    lockedBuildingId = newId;
-                    if (map.getLayer('3d-buildings-locked')) {
-                        map.setFilter('3d-buildings-locked', ['==', ['id'], newId]);
+                if (newLockedSet.size > 0) {
+                    if (oldIdsArray.length === 0) {
+                        AudioManager.play('click');
+                        speak('Био-сигналы обнаружены.');
                     }
-                    AudioManager.play('click');
-                    speak('Цель захвачена');
                     chUI.classList.add('locked');
-                }
-
-                lockText.innerText = 'ЦЕЛЬ ЗАХВАЧЕНА';
-                statusTag.innerText = 'LOCK';
-                targetTypeSpan.innerText = 'ЗДАНИЕ';
-            } else {
-                if (lockedBuildingId !== null) {
-                    lockedBuildingId = null;
-                    if (map.getLayer('3d-buildings-locked')) {
-                        map.setFilter('3d-buildings-locked', ['==', ['id'], '']);
-                    }
+                    lockText.innerText = 'X-RAY: СКАН';
+                    statusTag.innerText = 'BIO_DET';
+                    targetTypeSpan.innerText = newLockedSet.size > 1 ? 'ГРУППА' : 'ЦЕЛЬ';
+                } else {
                     chUI.classList.remove('locked');
+                    lockText.innerText = 'СКАНИРОВАНИЕ...';
+                    statusTag.innerText = 'ГОТОВ';
+                    targetTypeSpan.innerText = 'N/A';
                 }
-                lockText.innerText = 'СКАНИРОВАНИЕ...';
-                statusTag.innerText = 'ГОТОВ';
-                targetTypeSpan.innerText = 'N/A';
             }
         }
 
-        map.on('move', () => {
-            const c = map.getCenter();
-            coordsSpan.innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
-
-            if (!moveTimer) {
-                moveTimer = requestAnimationFrame(() => {
+        let updateQueued = false;
+        function queueUpdate() {
+            if (!updateQueued) {
+                updateQueued = true;
+                requestAnimationFrame(() => {
                     updateBuildingHighlight();
-                    moveTimer = null;
+                    updateQueued = false;
                 });
             }
-        });
+        }
 
-        // Дополнительная проверка при изменении зума
-        map.on('zoom', () => {
-            if (!moveTimer) {
-                moveTimer = requestAnimationFrame(() => {
-                    updateBuildingHighlight();
-                    moveTimer = null;
-                });
-            }
-        });
+        map.on('move', queueUpdate);
+        map.on('zoom', queueUpdate);
 
-        // ================== ЭФФЕКТЫ ==================
+        // ================== АНИМАЦИЯ И РЕНТГЕН ==================
         let particles = [];
+        let globalScanTimer = 0;
 
-        function ignite() {
-            const wpn = weapons[currentWpn];
-            const screenPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-
-            speak('Удар!');
-            AudioManager.play(wpn.sound);
-
-            if (wpn.id === 'plasma') {
-                ctx.shadowBlur = 30;
-                ctx.shadowColor = wpn.color;
-                ctx.strokeStyle = wpn.color;
-                ctx.lineWidth = 8;
-                ctx.beginPath();
-                ctx.moveTo(screenPos.x, 0);
-                ctx.lineTo(screenPos.x, screenPos.y - 20);
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
-
-            for (let i = 0; i < 55; i++) {
-                particles.push({
-                    x: screenPos.x + (Math.random() - 0.5) * 40,
-                    y: screenPos.y + (Math.random() - 0.5) * 40,
-                    vx: (Math.random() - 0.5) * 28,
-                    vy: (Math.random() - 0.5) * 28,
-                    size: Math.random() * 10 + 3,
-                    life: 1.0,
-                    color: wpn.color
-                });
-            }
-
-            body.style.filter = "brightness(2.5) contrast(1.3)";
-            setTimeout(() => body.style.filter = "none", 180);
-        }
-
-        function animateParticles() {
+        function drawXRay() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            globalScanTimer += 0.04;
+            
+            const bbox = getCrosshairBBox();
+
+            if (lockedBuildingIds.size > 0) {
+                lockedBuildingIds.forEach(id => {
+                    const data = buildingSigs.get(id);
+                    if (!data) return;
+                    
+                    if (data.scanProgress < 1) data.scanProgress += 0.02;
+                    
+                    const floors = data.floors;
+                    const spacing = (bbox.bottom - bbox.top) / floors;
+
+                    // Отрисовка этажей (сетка)
+                    for (let f = 0; f < floors; f++) {
+                        const y = bbox.top + (f * spacing);
+                        const alpha = (0.08 + Math.sin(globalScanTimer + f*0.3) * 0.04) * data.scanProgress;
+                        
+                        ctx.strokeStyle = `rgba(0, 210, 255, ${alpha})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(bbox.left + 8, y);
+                        ctx.lineTo(bbox.right - 8, y);
+                        ctx.stroke();
+
+                        // Отрисовка сигнатур людей
+                        data.entities.forEach(ent => {
+                            if (ent.floor === f) {
+                                ent.pulse += 0.035;
+                                const sizePulse = Math.abs(Math.sin(ent.pulse)) * 2.5;
+                                const posX = bbox.left + (bbox.right - bbox.left) * ent.relX;
+                                const posY = y + (Math.sin(ent.pulse + ent.phase) * 1.5);
+
+                                const grad = ctx.createRadialGradient(posX, posY, 0, posX, posY, 5 + sizePulse);
+                                grad.addColorStop(0, `rgba(255, 63, 52, ${0.8 * data.scanProgress})`);
+                                grad.addColorStop(1, 'rgba(255, 63, 52, 0)');
+
+                                ctx.fillStyle = grad;
+                                ctx.beginPath();
+                                ctx.arc(posX, posY, 7 + sizePulse, 0, Math.PI * 2);
+                                ctx.fill();
+
+                                ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * data.scanProgress})`;
+                                ctx.beginPath();
+                                ctx.arc(posX, posY, 1, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        });
+                    }
+                });
+
+                // Сканирующая линия
+                const scanY = bbox.top + ((Math.sin(globalScanTimer * 0.7) + 1) / 2) * (bbox.bottom - bbox.top);
+                ctx.strokeStyle = 'rgba(50, 255, 126, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(bbox.left, scanY);
+                ctx.lineTo(bbox.right, scanY);
+                ctx.stroke();
+            }
+
+            // Рендер частиц
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= 0.025;
-                if (p.life <= 0 || p.y < 0 || p.x < 0 || p.x > canvas.width) {
-                    particles.splice(i, 1);
-                    continue;
-                }
+                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                if (p.life <= 0) { particles.splice(i, 1); continue; }
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
                 ctx.fill();
             }
-            requestAnimationFrame(animateParticles);
+            ctx.globalAlpha = 1.0;
+            requestAnimationFrame(drawXRay);
         }
-        animateParticles();
+        drawXRay();
 
-        // ================== УПРАВЛЕНИЕ ==================
+        function ignite() {
+            const wpn = weapons[currentWpn];
+            const screenPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+            speak('Залп!');
+            AudioManager.play(wpn.sound);
+            
+            if (wpn.id === 'plasma') {
+                ctx.strokeStyle = wpn.color; ctx.lineWidth = 12;
+                ctx.beginPath(); ctx.moveTo(screenPos.x, 0); ctx.lineTo(screenPos.x, screenPos.y - 20); ctx.stroke();
+            }
+            
+            for (let i = 0; i < 50; i++) {
+                particles.push({
+                    x: screenPos.x + (Math.random() - 0.5) * 40, y: screenPos.y + (Math.random() - 0.5) * 40,
+                    vx: (Math.random() - 0.5) * 25, vy: (Math.random() - 0.5) * 25,
+                    size: Math.random() * 10 + 3, life: 1.0, color: wpn.color
+                });
+            }
+            body.style.filter = "brightness(3) contrast(1.5)";
+            setTimeout(() => body.style.filter = "none", 150);
+        }
+
         function cycleStyles() {
             body.classList.add('predator-glitch');
             AudioManager.play('emp');
             styleIndex = (styleIndex + 1) % styles.length;
-            lockedBuildingId = null;
+            lockedBuildingIds.clear(); 
+            // Мы НЕ очищаем buildingSigs, чтобы сохранить привязку к ID зданий при возврате к стилю
             map.setStyle(styles[styleIndex].url);
             speak('Режим: ' + styles[styleIndex].name);
             setTimeout(() => body.classList.remove('predator-glitch'), 500);
@@ -715,34 +755,22 @@
 
         document.getElementById('styleBtn').addEventListener('click', cycleStyles);
         document.getElementById('weaponBtn').addEventListener('click', cycleWeapons);
-        const fireBtn = document.getElementById('fireBtn');
-        fireBtn.addEventListener('click', ignite);
-        fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ignite(); });
+        document.getElementById('fireBtn').addEventListener('click', ignite);
 
         window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            map.resize();
-            setTimeout(updateBuildingHighlight, 100);
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            map.resize(); queueUpdate();
         });
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
         setInterval(() => {
             altSpan.innerText = (340 + Math.random() * 0.6).toFixed(2) + ' KM';
+            const c = map.getCenter();
+            coordsSpan.innerText = `${c.lng.toFixed(4)}, ${c.lat.toFixed(4)}`;
         }, 1800);
 
-        function unlockAudio() {
-            AudioManager.init();
-            document.removeEventListener('touchstart', unlockAudio);
-            document.removeEventListener('click', unlockAudio);
-        }
-        document.addEventListener('touchstart', unlockAudio);
-        document.addEventListener('click', unlockAudio);
-
-        setTimeout(() => {
-            speak('Система активирована. Киев, операция.');
-        }, 1000);
+        document.addEventListener('click', () => AudioManager.init());
+        setTimeout(() => speak('Интерфейс готов.'), 1000);
     })();
 </script>
 </body>
