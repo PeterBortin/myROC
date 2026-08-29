@@ -1,0 +1,2996 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#070b09">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="НЕБОСКОП — спостереження за повітряними цілями з телефона: азимут, кут місця, дальність, швидкість, курс.">
+<title>НЕБОСКОП</title>
+<style>
+/* ═══════════════ ТОКЕНИ ═══════════════ */
+:root{
+  --bg:#070b09; --bg2:#0b120e; --panel:#0f1913; --panel2:#142018;
+  --line:#1e3327; --line2:#2a4635;
+  --acc:#3ddc84; --acc-dim:#1f7a4a; --acc-glow:rgba(61,220,132,.18);
+  --warn:#f5b83d; --bad:#ff5a4e; --info:#5cc8ff;
+  --txt:#d6e6dc; --txt2:#8fa89a; --dim:#5e7568;
+  --r1:6px; --r2:12px; --r3:18px;
+  --tap:56px;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+  --dur:.18s;
+}
+html.night{
+  --acc:#ff6b5a; --acc-dim:#8a2f22; --acc-glow:rgba(255,107,90,.16);
+  --warn:#ff9a6a; --info:#ff8f7a; --bad:#ff3b30;
+  --txt:#f0c4bc; --txt2:#b07d74; --dim:#7a4f48;
+  --line:#3a1a15; --line2:#5a2a22; --panel:#150807; --panel2:#1d0d0a; --bg:#050202; --bg2:#0b0403;
+}
+html.night #vid{filter:saturate(.25) sepia(.5) hue-rotate(-30deg) brightness(.8) contrast(1.15)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:var(--sans);font-size:15px;overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body{position:fixed;inset:0;touch-action:none}
+button,input,select,textarea{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ═══════════════ СТАРТОВИЙ ЕКРАН ═══════════════ */
+#boot{position:fixed;inset:0;z-index:200;background:
+  radial-gradient(120% 80% at 50% 0%,#0f2018 0%,var(--bg) 60%);
+  display:flex;flex-direction:column;padding:calc(var(--sat) + 20px) 20px calc(var(--sab) + 20px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch}
+#boot.hide{display:none}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.brand svg{width:38px;height:38px;color:var(--acc);flex:0 0 auto}
+.brand h1{margin:0;font-size:26px;letter-spacing:.22em;font-weight:700}
+.brand small{display:block;font-size:10.5px;letter-spacing:.16em;color:var(--dim);font-weight:400;margin-top:3px}
+.lead{color:var(--txt2);font-size:13.5px;line-height:1.55;margin:14px 0 18px;max-width:44ch}
+.perm{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.perm-row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r2);padding:12px 14px}
+.perm-row svg{width:20px;height:20px;flex:0 0 auto;color:var(--txt2)}
+.perm-row b{font-size:14px;font-weight:600;display:block}
+.perm-row span{font-size:11.5px;color:var(--dim);display:block;margin-top:2px;line-height:1.35}
+.perm-row .st{margin-left:auto;font-size:11px;font-family:var(--mono);padding:4px 8px;border-radius:var(--r1);
+  border:1px solid var(--line2);color:var(--dim);white-space:nowrap}
+.perm-row[data-s="ok"] .st{color:var(--acc);border-color:var(--acc-dim);background:var(--acc-glow)}
+.perm-row[data-s="ok"] svg{color:var(--acc)}
+.perm-row[data-s="err"] .st{color:var(--bad);border-color:#5a231e}
+.perm-row[data-s="wait"] .st{color:var(--warn);border-color:#5a4a1e}
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;min-height:var(--tap);
+  background:var(--panel2);border:1px solid var(--line2);color:var(--txt);border-radius:var(--r2);
+  padding:0 18px;font-size:15px;font-weight:600;cursor:pointer;transition:transform var(--dur),background var(--dur);
+  touch-action:manipulation;width:100%}
+.btn:active{transform:scale(.975);background:var(--line)}
+.btn svg{width:19px;height:19px}
+.btn.primary{background:linear-gradient(180deg,#226f45,#144a2c);
+  border-color:var(--acc);color:#eafff2;box-shadow:0 0 0 1px var(--acc-glow),0 8px 26px -12px var(--acc)}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:42px;font-size:13.5px;padding:0 14px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.disclaim{margin-top:16px;font-size:11.5px;line-height:1.5;color:var(--dim);
+  border-left:2px solid var(--line2);padding-left:11px}
+.disclaim b{color:var(--warn);font-weight:600}
+
+/* ═══════════════ СЦЕНА ═══════════════ */
+#stage{position:fixed;inset:0;background:#000;overflow:hidden}
+#vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#ov{position:absolute;inset:0;width:100%;height:100%;touch-action:none;z-index:2}
+#hud{position:absolute;inset:0;z-index:3;pointer-events:none;display:flex;flex-direction:column}
+/* інтерактивні тільки смуги — середина кадру лишається для тапів по цілі */
+#hud .top,#hud .reads,#hud .acts{pointer-events:auto}
+
+/* ── верхня смуга ── */
+.top{padding:calc(var(--sat) + 6px) calc(var(--sar) + 8px) 0 calc(var(--sal) + 8px);
+  background:linear-gradient(180deg,rgba(4,8,6,.82),rgba(4,8,6,0))}
+.chips{display:flex;gap:5px;align-items:center;overflow:hidden}
+.chip{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;
+  background:rgba(10,20,14,.72);border:1px solid var(--line);border-radius:100px;padding:4px 9px;
+  color:var(--txt2);backdrop-filter:blur(8px);white-space:nowrap}
+.chip i{width:6px;height:6px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+.chip[data-s="ok"] i{background:var(--acc);box-shadow:0 0 6px var(--acc)}
+.chip[data-s="mid"] i{background:var(--warn)}
+.chip[data-s="bad"] i{background:var(--bad)}
+.chip.btn-chip{cursor:pointer}
+.chip.btn-chip:active{background:var(--line)}
+.spacer{flex:1 1 auto}
+
+/* компасна лінійка */
+.ruler{position:relative;height:38px;margin-top:6px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
+.ruler canvas{width:100%;height:100%;display:block}
+.ruler::after{content:"";position:absolute;left:50%;top:0;width:1px;height:100%;
+  background:linear-gradient(180deg,var(--acc),transparent);transform:translateX(-.5px)}
+
+/* ── центр ── */
+.mid{flex:1 1 auto;position:relative;pointer-events:none}
+.hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:12px;
+  color:var(--txt2);background:rgba(8,14,10,.75);border:1px solid var(--line);border-radius:100px;
+  padding:6px 14px;backdrop-filter:blur(8px);white-space:nowrap;max-width:calc(100% - 20px);
+  overflow:hidden;text-overflow:ellipsis;transition:opacity var(--dur)}
+.hint.gone{opacity:0}
+
+/* ── зчитування ── */
+.reads{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.rd{background:rgba(7,12,9,.9);padding:7px 8px 8px;backdrop-filter:blur(10px);min-width:0}
+.rd .k{font-size:9.5px;letter-spacing:.11em;color:var(--dim);text-transform:uppercase}
+.rd .v{font-family:var(--mono);font-size:20px;font-weight:600;line-height:1.16;margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd .u{font-size:11px;color:var(--txt2);font-weight:400}
+.rd .s{font-family:var(--mono);font-size:9.5px;letter-spacing:-.2px;color:var(--dim);margin-top:1px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.rd.good .v{color:var(--acc)} .rd.mid .v{color:var(--warn)} .rd.bad .v{color:var(--bad)}
+.rd.empty .v{color:var(--dim)}
+
+/* ── панель дій ── */
+.acts{display:flex;gap:8px;padding:9px calc(var(--sar) + 9px) calc(var(--sab) + 9px) calc(var(--sal) + 9px);
+  background:linear-gradient(0deg,rgba(4,8,6,.94),rgba(4,8,6,.7))}
+.act{flex:1 1 0;min-width:0;height:var(--tap);border-radius:var(--r2);border:1px solid var(--line2);
+  background:rgba(16,26,20,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;cursor:pointer;transition:transform .1s,background var(--dur);touch-action:manipulation}
+.act:active{transform:scale(.95);background:var(--line)}
+.act svg{width:21px;height:21px}
+.act span{font-size:10px;letter-spacing:.05em;color:var(--txt2);white-space:nowrap}
+.act.on{border-color:var(--acc);background:var(--acc-glow);box-shadow:0 0 0 1px var(--acc-glow)}
+.act.on svg,.act.on span{color:var(--acc)}
+.act.big{flex:1.5 1 0}
+.act.rec{border-color:var(--bad)} .act.rec svg{color:var(--bad)}
+
+/* ═══════════════ ШТОРКА ═══════════════ */
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg2);
+  border-top:1px solid var(--line2);border-radius:var(--r3) var(--r3) 0 0;
+  transform:translateY(100%);transition:transform .26s cubic-bezier(.32,.72,0,1);
+  display:flex;flex-direction:column;max-height:88vh;box-shadow:0 -20px 50px -20px #000}
+#sheet.open{transform:translateY(0)}
+.grip{padding:9px 0 4px;display:flex;justify-content:center;cursor:grab;touch-action:none;flex:0 0 auto}
+.grip::before{content:"";width:42px;height:4px;border-radius:2px;background:var(--line2)}
+.tabs{display:flex;gap:4px;padding:2px 10px 8px;overflow-x:auto;flex:0 0 auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:9px 13px;border-radius:100px;border:1px solid var(--line);
+  background:var(--panel);font-size:12.5px;color:var(--txt2);cursor:pointer;white-space:nowrap;
+  touch-action:manipulation;min-height:38px;display:flex;align-items:center}
+.tab.on{color:var(--acc);border-color:var(--acc-dim);background:var(--acc-glow)}
+.pages{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:0 14px calc(var(--sab) + 18px)}
+.page{display:none} .page.on{display:block}
+.sect{margin:14px 0 8px;font-size:10.5px;letter-spacing:.13em;color:var(--dim);text-transform:uppercase}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r2);padding:12px;margin-bottom:9px}
+.row{display:flex;align-items:center;gap:10px;min-height:44px}
+.row+.row{border-top:1px solid var(--line)}
+.row label{flex:1 1 auto;font-size:13.5px;min-width:0}
+.row label small{display:block;color:var(--dim);font-size:11px;margin-top:2px;line-height:1.35}
+.row .val{font-family:var(--mono);font-size:13px;color:var(--acc);white-space:nowrap}
+select,input[type=text],input[type=number]{background:var(--panel2);border:1px solid var(--line2);
+  border-radius:var(--r1);padding:9px 10px;min-height:42px;color:var(--txt);font-size:14px;max-width:100%}
+input[type=text],input[type=number]{font-family:var(--mono)}
+select{width:100%;-webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--txt2) 50%),linear-gradient(135deg,var(--txt2) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px,5px 5px;
+  background-repeat:no-repeat;padding-right:32px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--line2);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;
+  background:var(--acc);margin-top:-11px;box-shadow:0 0 0 4px var(--acc-glow)}
+input[type=range]::-moz-range-track{height:4px;background:var(--line2);border-radius:2px}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border:0;border-radius:50%;background:var(--acc)}
+.sw{position:relative;width:50px;height:30px;flex:0 0 auto;border-radius:100px;background:var(--line);
+  border:1px solid var(--line2);cursor:pointer;transition:background var(--dur)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+  background:var(--dim);transition:transform var(--dur),background var(--dur)}
+.sw.on{background:var(--acc-glow);border-color:var(--acc-dim)}
+.sw.on::after{transform:translateX(20px);background:var(--acc)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.note{font-size:11.5px;line-height:1.5;color:var(--dim);margin:6px 0 0}
+.note b{color:var(--warn)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0}
+.kv+.kv{border-top:1px solid var(--line)}
+.kv span:first-child{color:var(--txt2)} .kv span:last-child{font-family:var(--mono);color:var(--txt)}
+.big-copy{font-family:var(--mono);font-size:15px;background:var(--panel2);border:1px dashed var(--line2);
+  border-radius:var(--r1);padding:11px;word-break:break-all;line-height:1.5;color:var(--acc)}
+.logrow{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.logrow .t{font-family:var(--mono);font-size:11px;color:var(--dim);flex:0 0 auto}
+.logrow .m{flex:1 1 auto;min-width:0;font-size:12.5px}
+.logrow .m b{display:block;font-weight:600}
+.logrow .m small{color:var(--txt2);font-family:var(--mono);font-size:11px}
+.mini{width:100%;aspect-ratio:1/1;background:#050907;border:1px solid var(--line);border-radius:var(--r2);display:block}
+.spec{width:100%;height:110px;background:#050907;border:1px solid var(--line);border-radius:var(--r2);display:block}
+
+/* ═══════════════ АНАЛІТИЧНА ПАНЕЛЬ ═══════════════ */
+#side{position:absolute;top:0;right:0;bottom:0;width:44%;max-width:290px;z-index:4;
+  background:linear-gradient(270deg,rgba(6,11,8,.94),rgba(6,11,8,.72));
+  border-left:1px solid var(--line);padding:calc(var(--sat) + 54px) 10px calc(var(--sab) + 10px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;backdrop-filter:blur(6px)}
+body.analytic #side{display:block;top:calc(var(--sat) + 76px);bottom:calc(var(--sab) + 76px);
+  padding:10px 10px 14px;border-radius:var(--r2) 0 0 var(--r2);border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line)}
+/* центр і зчитування не залазять під панель, а смуга статусу і кнопки лишаються на всю ширину */
+body.analytic #hud{padding-right:min(44%,290px)}
+body.analytic .top,body.analytic .acts{margin-right:calc(-1 * min(44%,290px))}
+body.analytic #toast{padding-right:calc(min(44%,290px) + 12px)}
+body.analytic .rd .v{font-size:17px}
+body.analytic .reads{grid-template-columns:repeat(2,1fr)}
+#side .sect{margin:8px 0 6px}
+#side .kv{font-size:11.5px}
+
+/* ═══════════════ ТОСТИ / МОДАЛКА ═══════════════ */
+#toast{position:fixed;left:50%;top:calc(var(--sat) + 58px);transform:translateX(-50%);z-index:120;
+  display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:100%;padding:0 12px}
+.tst{background:rgba(12,22,16,.94);border:1px solid var(--line2);border-radius:100px;padding:9px 16px;
+  font-size:12.5px;max-width:92vw;text-align:center;backdrop-filter:blur(10px);
+  animation:tin .22s ease-out;box-shadow:0 10px 30px -12px #000}
+.tst.warn{border-color:#5a4a1e;color:var(--warn)} .tst.bad{border-color:#5a231e;color:var(--bad)}
+.tst.good{border-color:var(--acc-dim);color:var(--acc)}
+@keyframes tin{from{opacity:0;transform:translateY(-8px) scale(.96)}to{opacity:1;transform:none}}
+
+#modal{position:fixed;inset:0;z-index:150;background:rgba(2,5,3,.86);display:none;
+  align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+#modal.open{display:flex}
+.mbox{background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r3);padding:18px;
+  max-width:420px;width:100%;max-height:86vh;overflow-y:auto}
+.mbox h3{margin:0 0 4px;font-size:17px}
+.mbox p{font-size:13px;line-height:1.55;color:var(--txt2);margin:8px 0}
+.steps{counter-reset:s;margin:12px 0;padding:0;list-style:none}
+.steps li{counter-increment:s;position:relative;padding:9px 0 9px 34px;font-size:13px;line-height:1.5;
+  border-bottom:1px solid var(--line)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:9px;width:22px;height:22px;border-radius:50%;
+  background:var(--panel2);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-family:var(--mono);color:var(--txt2)}
+.steps li.done{color:var(--acc)} .steps li.done::before{background:var(--acc-glow);border-color:var(--acc-dim);color:var(--acc)}
+.mrow{display:flex;gap:8px;margin-top:12px}
+
+/* екран калібровки Місяця */
+body.calibrating #hud,body.calibrating #side{display:none}
+#calibView{position:fixed;inset:0;z-index:140;display:none;background:transparent}
+#calibView.open{display:block}
+#calibView canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.cv-top{position:absolute;top:0;left:0;right:0;padding:calc(var(--sat) + 12px) 14px 12px;
+  background:linear-gradient(180deg,rgba(4,8,6,.9),transparent);z-index:2;font-size:13px;line-height:1.5}
+.cv-bot{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(var(--sab) + 12px);
+  background:linear-gradient(0deg,rgba(4,8,6,.94),transparent);z-index:2;display:flex;gap:8px}
+
+@media (max-width:360px){
+  .rd .v{font-size:17px} .act span{font-size:9px} .reads{grid-template-columns:repeat(2,1fr)}
+}
+@media (orientation:landscape) and (max-height:460px){
+  .reads{grid-template-columns:repeat(4,1fr)} .rd .v{font-size:16px} .rd{padding:4px 7px 5px}
+  .acts{padding-top:6px} .act{height:46px} .ruler{height:30px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3l1.5-2h9L18 7h3v12H3z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+<symbol id="i-gyro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="3.6" ry="9"/></symbol>
+<symbol id="i-geo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12Z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8M8.5 10h7l2 4H6.5zM12 14v8"/></symbol>
+<symbol id="i-shot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="15" rx="2.5"/><circle cx="12" cy="12.5" r="4"/><path d="M7 2.5h4"/></symbol>
+<symbol id="i-rec" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h16M4 13h16M4 18h10"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16M3 12h18"/></symbol>
+<symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="20" height="8" rx="1.5"/><path d="M7 8v3M12 8v4M17 8v3"/></symbol>
+<symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 12h2.5l2-6 3 13 3-16 3 12 2.5-3H22"/></symbol>
+<symbol id="i-net" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><circle cx="12" cy="5" r="2.5"/><path d="M6.6 16.1 10.6 7M17.4 16.1 13.4 7M7.5 18h9"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1v.3a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.2A1.6 1.6 0 0 0 4.3 6.4l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V2a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7h.3a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.1 1.1Z"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 13.2A8.6 8.6 0 1 1 10.8 3 6.9 6.9 0 0 0 21 13.2Z"/></symbol>
+<symbol id="i-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.3 6.4L3 16M3 21v-5h5"/></symbol>
+<symbol id="i-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10.5l5 5 5-5M4 20h16"/></symbol>
+<symbol id="i-alt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M6 20V9l6-6 6 6v11"/><path d="M12 3v17"/></symbol>
+</defs></svg>
+
+<!-- ═══════════ СТАРТ ═══════════ -->
+<div id="boot">
+  <div class="brand">
+    <svg><use href="#i-target"/></svg>
+    <div><h1>НЕБОСКОП<small>ПАСИВНЕ СПОСТЕРЕЖЕННЯ ПОВІТРЯНИХ ЦІЛЕЙ · v1.0</small></h1></div>
+  </div>
+  <p class="lead">Камера, гіроскоп і геолокація телефона дають азимут, кут місця, дальність, швидкість і курс повітряної цілі. Все рахується на пристрої, нічого нікуди не йде.</p>
+
+  <div class="perm">
+    <div class="perm-row" id="p-cam" data-s="idle"><svg><use href="#i-cam"/></svg>
+      <div><b>Камера</b><span>основний канал спостереження</span></div><div class="st">не задано</div></div>
+    <div class="perm-row" id="p-gyro" data-s="idle"><svg><use href="#i-gyro"/></svg>
+      <div><b>Орієнтація</b><span>гіроскоп і магнітометр → азимут і кут місця</span></div><div class="st">не задано</div></div>
+    <div class="perm-row" id="p-geo" data-s="idle"><svg><use href="#i-geo"/></svg>
+      <div><b>Геолокація</b><span>власна точка для розрахунку координат цілі</span></div><div class="st">не задано</div></div>
+    <div class="perm-row" id="p-mic" data-s="idle"><svg><use href="#i-mic"/></svg>
+      <div><b>Мікрофон</b><span>спектр гулу і акустична дальність · необов'язково</span></div><div class="st">не задано</div></div>
+  </div>
+
+  <button class="btn primary" id="btn-start"><svg><use href="#i-eye"/></svg>ЗАПУСТИТИ</button>
+  <div style="height:8px"></div>
+  <button class="btn ghost sm" id="btn-skip-mic">Далі без мікрофона</button>
+
+  <p class="disclaim"><b>Чесно про точність.</b> Компас телефона бреше на 2–10° навіть після калібровки, а дальність за кутовим розміром на 5 км — це оцінка «в межах порядку», не вимір. Кожна цифра показується з коридором похибки. Це інструмент спостереження й оцінки, а не прилад наведення. Перевіряй результат іншим джерелом, перш ніж на нього спиратися.</p>
+</div>
+
+<!-- ═══════════ СЦЕНА ═══════════ -->
+<div id="stage">
+  <video id="vid" playsinline autoplay muted></video>
+  <canvas id="ov"></canvas>
+
+  <div id="side">
+    <div class="sect">Обстановка</div>
+    <canvas id="mini" class="mini"></canvas>
+    <div class="sect">Кінематика</div>
+    <div id="sideKin"></div>
+    <div class="sect">Дальність за методами</div>
+    <div id="sideRange"></div>
+    <div class="sect">Спектр</div>
+    <canvas id="spec2" class="spec"></canvas>
+    <div class="sect">Гіпотези типу</div>
+    <div id="sideGuess" class="note">—</div>
+  </div>
+
+  <div id="hud">
+    <div class="top">
+      <div class="chips">
+        <div class="chip" id="c-gps" data-s="bad"><i></i><span>GPS —</span></div>
+        <div class="chip" id="c-comp" data-s="bad"><i></i><span>АЗ —</span></div>
+        <div class="chip" id="c-cal" data-s="bad"><i></i><span>FOV —</span></div>
+        <div class="spacer"></div>
+        <div class="chip btn-chip" id="c-mode"><span>БОЙ</span></div>
+        <div class="chip btn-chip" id="c-night"><svg style="width:13px;height:13px"><use href="#i-moon"/></svg></div>
+      </div>
+      <div class="ruler"><canvas id="ruler"></canvas></div>
+    </div>
+
+    <div class="mid"><div class="hint" id="hint">Тапни по цілі, щоб узяти на супровід</div></div>
+
+    <div class="reads">
+      <div class="rd empty" id="r-dist"><div class="k">Дальність</div><div class="v">—</div><div class="s">метод —</div></div>
+      <div class="rd empty" id="r-spd"><div class="k">Швидкість</div><div class="v">—</div><div class="s">—</div></div>
+      <div class="rd empty" id="r-hdg"><div class="k">Курс цілі</div><div class="v">—</div><div class="s">—</div></div>
+      <div class="rd empty" id="r-alt"><div class="k">Висота</div><div class="v">—</div><div class="s">—</div></div>
+    </div>
+
+    <div class="acts">
+      <div class="act big" id="a-lock"><svg><use href="#i-target"/></svg><span>ЗАХОПИТИ</span></div>
+      <div class="act" id="a-auto"><svg><use href="#i-scan"/></svg><span>АВТО</span></div>
+      <div class="act" id="a-fix"><svg><use href="#i-pin"/></svg><span>ФІКС</span></div>
+      <div class="act" id="a-shot"><svg><use href="#i-shot"/></svg><span>КАДР</span></div>
+      <div class="act" id="a-rec"><svg><use href="#i-rec"/></svg><span>ЗАПИС</span></div>
+      <div class="act" id="a-menu"><svg><use href="#i-menu"/></svg><span>МЕНЮ</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ШТОРКА ═══════════ -->
+<div id="sheet">
+  <div class="grip" id="grip"></div>
+  <div class="tabs" id="tabs">
+    <div class="tab on" data-p="t-target">Ціль</div>
+    <div class="tab" data-p="t-calib">Калібровка</div>
+    <div class="tab" data-p="t-sound">Звук</div>
+    <div class="tab" data-p="t-tri">Тріангуляція</div>
+    <div class="tab" data-p="t-log">Журнал</div>
+    <div class="tab" data-p="t-set">Налаштування</div>
+  </div>
+  <div class="pages">
+
+    <!-- ЦІЛЬ -->
+    <div class="page on" id="t-target">
+      <div class="sect">Тип цілі</div>
+      <div class="card">
+        <select id="sel-type"></select>
+        <div class="note" id="type-note"></div>
+        <div class="row"><label>Розмір цілі <small>розмах / характерний габарит</small></label>
+          <input type="number" id="in-size" step="0.05" min="0.05" style="width:96px"><span class="val">м</span></div>
+        <div class="row"><label>Робоча висота <small>для методу «за кутом місця»</small></label>
+          <input type="number" id="in-talt" step="50" min="0" style="width:96px"><span class="val">м</span></div>
+        <input type="range" id="rg-talt" min="50" max="12000" step="50">
+        <div class="note">Діапазон з каталогу: <b id="alt-range">—</b>. Постав середину діапазону, якщо точно не знаєш — коридор похибки це врахує.</div>
+      </div>
+
+      <div class="sect">Методи дальності</div>
+      <div class="card" id="method-rows">
+        <div class="row"><label>За розміром у кадрі <small>потрібна калібровка FOV і рамка на цілі</small></label><div class="sw on" data-m="size"></div></div>
+        <div class="row"><label>За висотою і кутом місця <small>найстабільніший метод</small></label><div class="sw on" data-m="alt"></div></div>
+        <div class="row"><label>Акустична затримка <small>вкладка «Звук»</small></label><div class="sw" data-m="acoustic"></div></div>
+        <div class="row"><label>Тріангуляція <small>вкладка «Тріангуляція»</small></label><div class="sw" data-m="triang"></div></div>
+        <div class="note">Увімкнені методи зважуються за оберненою дисперсією. Якщо вони суперечать один одному — коридор похибки автоматично роздувається.</div>
+      </div>
+
+      <div class="sect">Поточна оцінка</div>
+      <div class="card" id="est-card"><div class="note">Цілі на супроводі немає.</div></div>
+    </div>
+
+    <!-- КАЛІБРОВКА -->
+    <div class="page" id="t-calib">
+      <div class="sect">Поле зору камери</div>
+      <div class="card">
+        <div class="kv"><span>Поточний f<sub>px</sub></span><span id="k-fpx">—</span></div>
+        <div class="kv"><span>Горизонтальне FOV</span><span id="k-fov">—</span></div>
+        <div class="kv"><span>Зум</span><span id="k-zoom">1.0×</span></div>
+        <div class="kv"><span>Джерело</span><span id="k-src">—</span></div>
+        <div style="height:10px"></div>
+        <div class="grid2">
+          <button class="btn sm" id="cal-gyro"><svg><use href="#i-gyro"/></svg>По гіроскопу</button>
+          <button class="btn sm" id="cal-moon"><svg><use href="#i-moon"/></svg>По Місяцю</button>
+        </div>
+        <div style="height:8px"></div>
+        <label class="note">Ручне FOV, °</label>
+        <input type="range" id="rg-fov" min="20" max="90" step="0.5">
+        <div class="note">Калібровка зберігається окремо для кожного рівня зуму. Змінив зум — перекалібруй, або система візьме масштабоване значення й позначить його як приблизне.</div>
+      </div>
+
+      <div class="sect">Зум камери</div>
+      <div class="card">
+        <input type="range" id="rg-zoom" min="1" max="1" step="0.1">
+        <div class="note" id="zoom-note">Оптичний зум недоступний на цьому пристрої.</div>
+      </div>
+
+      <div class="sect">Азимут</div>
+      <div class="card">
+        <div class="kv"><span>Сирий магнітний</span><span id="k-magaz">—</span></div>
+        <div class="kv"><span>Схилення</span><span id="k-decl">—</span></div>
+        <div class="kv"><span>Ручна поправка</span><span id="k-off">0.0°</span></div>
+        <div class="kv"><span>Підсумковий істинний</span><span id="k-trueaz">—</span></div>
+        <div style="height:10px"></div>
+        <input type="range" id="rg-off" min="-30" max="30" step="0.5">
+        <div class="grid2">
+          <button class="btn sm" id="cal-ref">Обнулити по орієнтиру</button>
+          <button class="btn sm" id="cal-reset">Скинути поправку</button>
+        </div>
+        <div class="row"><label>Гіроскопне утримання <small>магнітометр коригує повільно, картинка не смикається</small></label><div class="sw on" id="sw-gyrohold"></div></div>
+        <div class="note">Схилення рахується спрощеною моделлю для регіону (похибка ~0.5°). Якщо поруч метал, лінія електропередач чи авто — магнітометр бреше сильніше; тоді обнуляй по орієнтиру з відомим азимутом.</div>
+      </div>
+    </div>
+
+    <!-- ЗВУК -->
+    <div class="page" id="t-sound">
+      <div class="sect">Спектр</div>
+      <div class="card">
+        <canvas id="spec" class="spec"></canvas>
+        <div class="kv"><span>Пік у смузі 40–400 Гц</span><span id="k-peak">—</span></div>
+        <div class="kv"><span>Рівень</span><span id="k-lvl">—</span></div>
+        <div class="note">Мотор Shahed дає характерний гул із гармоніками приблизно в діапазоні 80–130 Гц. Це підказка, а не розпізнавання: вітер, генератор і мотоцикл виглядають схоже.</div>
+      </div>
+      <div class="sect">Акустична дальність</div>
+      <div class="card">
+        <div class="grid2">
+          <button class="btn" id="snd-see"><svg><use href="#i-eye"/></svg>БАЧУ</button>
+          <button class="btn" id="snd-hear"><svg><use href="#i-mic"/></svg>ЧУЮ</button>
+        </div>
+        <div style="height:10px"></div>
+        <div class="kv"><span>Затримка</span><span id="k-dt">—</span></div>
+        <div class="kv"><span>Дальність</span><span id="k-adist">—</span></div>
+        <div class="row"><label>Температура повітря <small>впливає на швидкість звуку</small></label>
+          <input type="number" id="in-temp" step="1" style="width:80px"><span class="val">°C</span></div>
+        <div class="note">Порядок: тапнув «БАЧУ» в момент, коли ціль проходить точку над тобою, тапнув «ЧУЮ», коли звук від тієї ж точки дійшов. Похибка методу — приблизно ±140 м на кожні 0.4 с твоєї реакції.</div>
+      </div>
+    </div>
+
+    <!-- ТРІАНГУЛЯЦІЯ -->
+    <div class="page" id="t-tri">
+      <div class="sect">Мій пеленг</div>
+      <div class="card">
+        <div class="big-copy" id="my-fix">—</div>
+        <div style="height:8px"></div>
+        <div class="grid2">
+          <button class="btn sm" id="tri-refresh"><svg><use href="#i-flip"/></svg>Оновити</button>
+          <button class="btn sm" id="tri-copy">Копіювати</button>
+        </div>
+        <div class="note">Продиктуй цей рядок другому спостерігачу голосом або передай будь-яким каналом. Формат: <span class="mono">NBK1|широта|довгота|азимут|кут місця|висота|час</span>.</div>
+      </div>
+
+      <div class="sect">Пеленг другого спостерігача</div>
+      <div class="card">
+        <input type="text" id="in-fix" placeholder="NBK1|50.12345|30.54321|137.3|12.4|180|142530" style="width:100%">
+        <div style="height:8px"></div>
+        <button class="btn sm" id="tri-apply">Порахувати перетин</button>
+        <div id="tri-out" class="note">Чекаю на другий пеленг.</div>
+      </div>
+
+      <div class="sect">Власна база</div>
+      <div class="card">
+        <div class="note">Працює по повільних цілях: узяв пеленг, пройшов 50–200 м убік, узяв другий. Система сама рахує базу між твоїми двома точками.</div>
+        <div style="height:8px"></div>
+        <div class="grid2">
+          <button class="btn sm" id="tri-mark">Зафіксувати пеленг A</button>
+          <button class="btn sm" id="tri-solve">Замкнути в точці B</button>
+        </div>
+        <div id="tri-self" class="note">Точка A не задана.</div>
+      </div>
+    </div>
+
+    <!-- ЖУРНАЛ -->
+    <div class="page" id="t-log">
+      <div class="sect">Записані цілі <span id="log-count" class="mono"></span></div>
+      <div class="card" id="log-list"><div class="note">Журнал порожній. Кнопка «ФІКС» на головному екрані записує поточний стан цілі.</div></div>
+      <div class="grid2">
+        <button class="btn sm" data-exp="json"><svg><use href="#i-dl"/></svg>JSON</button>
+        <button class="btn sm" data-exp="csv"><svg><use href="#i-dl"/></svg>CSV</button>
+        <button class="btn sm" data-exp="geojson"><svg><use href="#i-dl"/></svg>GeoJSON</button>
+        <button class="btn sm" data-exp="kml"><svg><use href="#i-dl"/></svg>KML</button>
+      </div>
+      <div style="height:8px"></div>
+      <button class="btn sm ghost" id="log-clear"><svg><use href="#i-x"/></svg>Очистити журнал</button>
+    </div>
+
+    <!-- НАЛАШТУВАННЯ -->
+    <div class="page" id="t-set">
+      <div class="sect">Власна точка</div>
+      <div class="card">
+        <div class="kv"><span>Координати</span><span id="k-me">—</span></div>
+        <div class="kv"><span>MGRS</span><span id="k-me-mgrs">—</span></div>
+        <div class="kv"><span>Точність GPS</span><span id="k-acc">—</span></div>
+        <div class="row"><label>Висота спостерігача <small>GPS-висота бреше; краще задати вручну</small></label>
+          <input type="number" id="in-oalt" step="10" style="width:90px"><span class="val">м</span></div>
+        <div class="row"><label>Ручний ввід точки <small>працює зовсім без GPS</small></label><div class="sw" id="sw-manual"></div></div>
+        <div class="grid2" id="manual-box" style="display:none">
+          <input type="number" id="in-lat" step="0.00001" placeholder="широта">
+          <input type="number" id="in-lon" step="0.00001" placeholder="довгота">
+        </div>
+      </div>
+
+      <div class="sect">Відображення</div>
+      <div class="card">
+        <div class="row"><label>Формат координат</label>
+          <select id="sel-coord" style="width:150px">
+            <option value="mgrs">MGRS</option><option value="dm">Градуси-хвилини</option>
+            <option value="dms">Градуси-хв-сек</option><option value="dd">Десяткові</option>
+          </select></div>
+        <div class="row"><label>Швидкість</label>
+          <select id="sel-spd" style="width:150px">
+            <option value="kmh">км/год</option><option value="ms">м/с</option><option value="kt">вузли</option>
+          </select></div>
+        <div class="row"><label>Нічний режим <small>червона палітра, приглушена картинка</small></label><div class="sw" id="sw-night"></div></div>
+        <div class="row"><label>Аналітичний режим <small>бічна панель з картою і спектром</small></label><div class="sw" id="sw-analytic"></div></div>
+        <div class="row"><label>Лінія екстраполяції <small>куди ціль вийде за 60 с</small></label><div class="sw on" id="sw-extra"></div></div>
+        <div class="row"><label>Вібровідгук</label><div class="sw on" id="sw-vibro"></div></div>
+        <div class="row"><label>Звукові сигнали <small>захоплення і втрата цілі</small></label><div class="sw on" id="sw-beep"></div></div>
+        <div class="row"><label>Екран не гасне</label><div class="sw on" id="sw-wake"></div></div>
+      </div>
+
+      <div class="sect">Детектор</div>
+      <div class="card">
+        <div class="row"><label>Чутливість <small>вище — більше кандидатів і більше хибних</small></label></div>
+        <input type="range" id="rg-sens" min="1.5" max="8" step="0.1">
+        <div class="row"><label>Мінімальний розмір плями</label></div>
+        <input type="range" id="rg-minpx" min="1" max="40" step="1">
+        <div class="row"><label>Тільки вище горизонту <small>відсікає землю за кутом місця</small></label><div class="sw on" id="sw-skyonly"></div></div>
+        <div class="row"><label>Нейромодель ONNX <small>файл model.onnx поруч з index.html</small></label><div class="sw" id="sw-onnx"></div></div>
+        <div class="note" id="onnx-note">Вимкнено. Класичний детектор по небу працює без будь-яких файлів і не потребує мережі.</div>
+      </div>
+
+      <div class="sect">Фільтр супроводу</div>
+      <div class="card">
+        <div class="row"><label>Згладжування α <small>реакція на нові виміри</small></label><span class="val" id="k-alpha">0.55</span></div>
+        <input type="range" id="rg-alpha" min="0.15" max="1" step="0.05">
+        <div class="row"><label>Швидкість β <small>як швидко оновлюється вектор руху</small></label><span class="val" id="k-beta">0.12</span></div>
+        <input type="range" id="rg-beta" min="0.02" max="0.6" step="0.01">
+      </div>
+
+      <div class="sect">Про</div>
+      <div class="card">
+        <div class="note">НЕБОСКОП v1.0 · один файл, без мережі, без телеметрії. Всі налаштування зберігаються тільки в цьому браузері.<br><br>
+        <b>Межі застосування.</b> Дальність за кутовим розміром при цілі в 8–15 пікселів дає похибку 30–50%. Дальність за висотою настільки точна, наскільки правильно вгадана висота польоту. Тріангуляція точна, але потребує другого спостерігача й доброго кута перетину. Показані цифри — оцінка, і поруч із кожною стоїть її коридор.</div>
+        <div style="height:8px"></div>
+        <button class="btn sm ghost" id="btn-reset-all">Скинути всі налаштування</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+
+<div id="calibView">
+  <canvas id="cvCanvas"></canvas>
+  <div class="cv-top" id="cvTop"></div>
+  <div class="cv-bot">
+    <button class="btn" id="cvAct">ДАЛІ</button>
+    <button class="btn ghost" id="cvCancel" style="max-width:110px">Вихід</button>
+  </div>
+</div>
+<script>
+/* ── 10_math.js ── */
+/* ============================================================
+   НЕБОСКОП — ядро математики (чиста логіка, без DOM)
+   ============================================================ */
+const NBK = (function () {
+  'use strict';
+
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+  const norm360 = a => ((a % 360) + 360) % 360;
+  const norm180 = a => { let x = norm360(a); return x > 180 ? x - 360 : x; };
+  const hyp = (...v) => Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+
+  /* ---------- 1. Орієнтація пристрою ------------------------ */
+  // W3C deviceorientation: R = Rz(alpha)·Rx(beta)·Ry(gamma),
+  // переводить вектор із системи пристрою у ENU (X=Схід, Y=Північ, Z=Верх).
+  function rotMatrix(alphaDeg, betaDeg, gammaDeg) {
+    const a = alphaDeg * D2R, b = betaDeg * D2R, g = gammaDeg * D2R;
+    const cA = Math.cos(a), sA = Math.sin(a);
+    const cB = Math.cos(b), sB = Math.sin(b);
+    const cG = Math.cos(g), sG = Math.sin(g);
+    return [
+      [cA * cG - sA * sB * sG, -sA * cB, cA * sG + sA * sB * cG],
+      [sA * cG + cA * sB * sG, cA * cB, sA * sG - cA * sB * cG],
+      [-cB * sG, sB, cB * cG]
+    ];
+  }
+  function matVec(R, v) {
+    return [
+      R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
+      R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
+      R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2]
+    ];
+  }
+  function vecToAzEl(v) {
+    const n = hyp(v[0], v[1], v[2]) || 1;
+    const e = v[0] / n, nn = v[1] / n, u = v[2] / n;
+    return { az: norm360(Math.atan2(e, nn) * R2D), el: Math.asin(clamp(u, -1, 1)) * R2D };
+  }
+
+  /**
+   * Азимут/кут місця для довільного пікселя кадру.
+   * dx, dy — зміщення від центра кадру в пікселях (dy вниз додатний),
+   * fpx    — фокусна відстань у пікселях для поточного зуму,
+   * screenAngle — кут повороту екрана (0/90/180/270).
+   */
+  function pixelToAzEl(orient, dx, dy, fpx, screenAngle) {
+    const s = (screenAngle || 0) * D2R;
+    const cs = Math.cos(s), sn = Math.sin(s);
+    // компенсація повороту екрана відносно системи координат пристрою
+    const rx = dx * cs + dy * sn;
+    const ry = -dx * sn + dy * cs;
+    // камера дивиться вздовж -Z пристрою; вісь Y пристрою вгору
+    const dir = [rx, -ry, -fpx];
+    const R = rotMatrix(orient.alpha, orient.beta, orient.gamma);
+    return vecToAzEl(matVec(R, dir));
+  }
+
+  /** Кутовий розмір відрізка в пікселях -> градуси */
+  const pxToDeg = (px, fpx) => 2 * Math.atan2(px / 2, fpx) * R2D;
+  /** Горизонтальне поле зору для ширини кадру */
+  const fovFromF = (widthPx, fpx) => pxToDeg(widthPx, fpx);
+  const fFromFov = (widthPx, fovDeg) => (widthPx / 2) / Math.tan(fovDeg * D2R / 2);
+
+  /* ---------- 2. Геодезія ----------------------------------- */
+  const EARTH_R = 6378137.0;
+  const metersPerDegLat = lat =>
+    111132.92 - 559.82 * Math.cos(2 * lat * D2R) + 1.175 * Math.cos(4 * lat * D2R);
+  const metersPerDegLon = lat =>
+    111412.84 * Math.cos(lat * D2R) - 93.5 * Math.cos(3 * lat * D2R);
+
+  /** Локальні ENU-метри -> WGS84 (плоска апроксимація, коректна до ~60 км) */
+  function enuToLatLon(lat0, lon0, e, n) {
+    return {
+      lat: lat0 + n / metersPerDegLat(lat0),
+      lon: lon0 + e / metersPerDegLon(lat0)
+    };
+  }
+  function latLonToEnu(lat0, lon0, lat, lon) {
+    return {
+      e: (lon - lon0) * metersPerDegLon(lat0),
+      n: (lat - lat0) * metersPerDegLat(lat0)
+    };
+  }
+  /** Точка за азимутом і дальністю */
+  function destPoint(lat0, lon0, azDeg, distM) {
+    const a = azDeg * D2R;
+    return enuToLatLon(lat0, lon0, distM * Math.sin(a), distM * Math.cos(a));
+  }
+  function bearingDist(lat1, lon1, lat2, lon2) {
+    const { e, n } = latLonToEnu(lat1, lon1, lat2, lon2);
+    return { az: norm360(Math.atan2(e, n) * R2D), dist: hyp(e, n) };
+  }
+
+  /* ---------- 3. Магнітне схилення (спрощено, регіон UA) ----- */
+  /* Лінійна апроксимація WMM для 44–53°N / 22–41°E, епоха 2025.0,
+     віковий хід ~ +0.09°/рік. Похибка порядку ±0.5°.
+     Поза цим прямокутником повертає null — тоді потрібне ручне введення. */
+  function magDeclination(lat, lon, year) {
+    if (lat < 42 || lat > 55 || lon < 20 || lon > 43) return null;
+    const base = 8.60 + 0.205 * (lon - 30.5) + 0.060 * (lat - 50.45);
+    const dt = (year == null ? 2025 : year) - 2025.0;
+    return +(base + 0.09 * dt).toFixed(2);
+  }
+
+  /* ---------- 4. UTM / MGRS --------------------------------- */
+  function latLonToUtm(lat, lon) {
+    const a = 6378137.0, f = 1 / 298.257223563;
+    const k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+    let zone = Math.floor((lon + 180) / 6) + 1;
+    if (lat >= 56 && lat < 64 && lon >= 3 && lon < 12) zone = 32;
+    if (lat >= 72 && lat < 84) {
+      if (lon >= 0 && lon < 9) zone = 31; else if (lon < 21) zone = 33;
+      else if (lon < 33) zone = 35; else if (lon < 42) zone = 37;
+    }
+    const lon0 = (zone - 1) * 6 - 180 + 3;
+    const p = lat * D2R, l = (lon - lon0) * D2R;
+    const N = a / Math.sqrt(1 - e2 * Math.sin(p) ** 2);
+    const T = Math.tan(p) ** 2, C = ep2 * Math.cos(p) ** 2, A = Math.cos(p) * l;
+    const M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 ** 3 / 256) * p
+      - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * p)
+      + (15 * e2 * e2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * p)
+      - (35 * e2 ** 3 / 3072) * Math.sin(6 * p));
+    const easting = k0 * N * (A + (1 - T + C) * A ** 3 / 6
+      + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+    let northing = k0 * (M + N * Math.tan(p) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24
+      + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720));
+    if (lat < 0) northing += 10000000;
+    return { zone, easting, northing, hemisphere: lat >= 0 ? 'N' : 'S' };
+  }
+  const LAT_BANDS = 'CDEFGHJKLMNPQRSTUVWXX';
+  const latBand = lat => lat >= -80 && lat <= 84 ? LAT_BANDS[Math.floor((lat + 80) / 8)] : '';
+  const E_SET = ['ABCDEFGH', 'JKLMNPQR', 'STUVWXYZ'];
+  const N_SET = ['ABCDEFGHJKLMNPQRSTUV', 'FGHJKLMNPQRSTUVABCDE'];
+
+  /** MGRS з точністю 1 м (5+5 цифр) */
+  function toMGRS(lat, lon, digits) {
+    const d = digits == null ? 5 : digits;
+    const u = latLonToUtm(lat, lon);
+    const band = latBand(lat);
+    if (!band) return null;
+    const col = Math.floor(u.easting / 100000);
+    const row = Math.floor(u.northing / 100000) % 20;
+    const colLetter = E_SET[(u.zone - 1) % 3][clamp(col - 1, 0, 7)];
+    const rowLetter = N_SET[(u.zone - 1) % 2][row];
+    const p = Math.pow(10, 5 - d);
+    const e = String(Math.floor((u.easting % 100000) / p)).padStart(d, '0');
+    const n = String(Math.floor((u.northing % 100000) / p)).padStart(d, '0');
+    return `${u.zone}${band} ${colLetter}${rowLetter} ${e} ${n}`;
+  }
+
+  function toDMS(v, isLat) {
+    const hemi = isLat ? (v >= 0 ? 'Пн' : 'Пд') : (v >= 0 ? 'Сх' : 'Зх');
+    const a = Math.abs(v), deg = Math.floor(a);
+    const minF = (a - deg) * 60, min = Math.floor(minF);
+    const sec = (minF - min) * 60;
+    return `${deg}°${String(min).padStart(2, '0')}'${sec.toFixed(1).padStart(4, '0')}" ${hemi}`;
+  }
+  /** Формат «градуси-хвилини», як у більшості наших карток цілей */
+  function toDM(v, isLat) {
+    const hemi = isLat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
+    const a = Math.abs(v), deg = Math.floor(a);
+    return `${hemi}${String(deg).padStart(2, '0')}°${((a - deg) * 60).toFixed(3).padStart(6, '0')}'`;
+  }
+
+  /* ---------- 5. Методи оцінки дальності --------------------- */
+  /* Кожен повертає { r, sigma, method } у метрах або null. */
+
+  /** За відомим лінійним розміром цілі та її кутовим розміром у кадрі */
+  function rangeBySize(sizeM, sizePx, fpx, opts) {
+    const o = opts || {};
+    if (!(sizeM > 0) || !(sizePx > 0.5) || !(fpx > 0)) return null;
+    const theta = 2 * Math.atan2(sizePx / 2, fpx);
+    const r = sizeM / (2 * Math.tan(theta / 2));
+    // похибки: ±1.5 px на вимірі рамки та ±20 % на табличному розмірі
+    const dPx = o.pxErr == null ? 1.5 : o.pxErr;
+    const relSize = o.sizeRel == null ? 0.20 : o.sizeRel;
+    const rel = Math.sqrt((dPx / sizePx) ** 2 + relSize ** 2);
+    return { r, sigma: r * rel, method: 'size' };
+  }
+
+  /** За висотою польоту та кутом місця: похила дальність = Δh / sin(el) */
+  function rangeByAltitude(targetAltM, observerAltM, elDeg, opts) {
+    const o = opts || {};
+    const dh = targetAltM - observerAltM;
+    if (!(dh > 0)) return null;
+    if (elDeg < 1.0) return null;           // біля горизонту метод вироджується
+    const s = Math.sin(elDeg * D2R);
+    const r = dh / s;
+    const dAlt = o.altErr == null ? Math.max(150, dh * 0.35) : o.altErr;
+    const dEl = o.elErr == null ? 1.5 : o.elErr;            // градуси
+    const dr_dh = 1 / s;
+    const dr_del = -dh * Math.cos(elDeg * D2R) / (s * s) * D2R;
+    const sigma = Math.sqrt((dr_dh * dAlt) ** 2 + (dr_del * dEl) ** 2);
+    return { r, sigma, method: 'alt' };
+  }
+
+  /** Швидкість звуку з поправкою на температуру повітря */
+  const soundSpeed = tempC => 331.3 * Math.sqrt(1 + (tempC == null ? 15 : tempC) / 273.15);
+
+  /** Акустична затримка: різниця «побачив» / «почув» */
+  function rangeByAcoustic(dtSec, tempC, opts) {
+    const o = opts || {};
+    if (!(dtSec > 0.2)) return null;
+    const c = soundSpeed(tempC);
+    const r = c * dtSec;
+    const dT = o.tapErr == null ? 0.4 : o.tapErr;   // реакція оператора
+    return { r, sigma: c * dT, method: 'acoustic' };
+  }
+
+  /**
+   * Тріангуляція: перетин двох пеленгів.
+   * A — власна точка, B — точка другого спостерігача (або власна попередня).
+   * Повертає точку цілі, дальність від A та оцінку похибки.
+   */
+  function triangulate(A, B, azA, azB, bearErrDeg) {
+    const err = bearErrDeg == null ? 2.0 : bearErrDeg;
+    const { e: be, n: bn } = latLonToEnu(A.lat, A.lon, B.lat, B.lon);
+    const baseline = hyp(be, bn);
+    if (baseline < 20) return null;                       // база замала
+    const ua = [Math.sin(azA * D2R), Math.cos(azA * D2R)];
+    const ub = [Math.sin(azB * D2R), Math.cos(azB * D2R)];
+    const den = ua[0] * ub[1] - ua[1] * ub[0];            // векторний добуток
+    if (Math.abs(den) < 1e-6) return null;                // пеленги паралельні
+    const t = (be * ub[1] - bn * ub[0]) / den;
+    if (t <= 0) return null;                              // перетин позаду
+    const e = ua[0] * t, n = ua[1] * t;
+    const r = hyp(e, n);
+    // похибка ~ r·Δθ / sin(кут перетину)
+    const cross = Math.abs(Math.asin(clamp(den, -1, 1)));
+    const sigma = r * (err * D2R) / Math.max(Math.sin(cross), 0.05);
+    const pt = enuToLatLon(A.lat, A.lon, e, n);
+    return { r, sigma, method: 'triang', e, n, lat: pt.lat, lon: pt.lon, baseline, crossDeg: cross * R2D };
+  }
+
+  /** Зважена фузія оцінок за оберненою дисперсією */
+  function fuseRanges(list) {
+    const good = (list || []).filter(x => x && isFinite(x.r) && x.r > 0 && isFinite(x.sigma) && x.sigma > 0);
+    if (!good.length) return null;
+    let wsum = 0, acc = 0;
+    for (const g of good) { const w = 1 / (g.sigma * g.sigma); wsum += w; acc += w * g.r; }
+    const r = acc / wsum;
+    const sigma = Math.sqrt(1 / wsum);
+    // якщо оцінки суперечать одна одній — розширюємо коридор
+    let chi = 0;
+    for (const g of good) chi += ((g.r - r) / g.sigma) ** 2;
+    const dof = Math.max(good.length - 1, 1);
+    const infl = Math.sqrt(Math.max(1, chi / dof));
+    return { r, sigma: sigma * infl, method: 'fused', used: good.map(g => g.method), consistency: chi / dof };
+  }
+
+  /* ---------- 6. Фільтр стану цілі (α-β) --------------------- */
+  function makeTrack(alpha, beta) {
+    return {
+      alpha: alpha == null ? 0.55 : alpha,
+      beta: beta == null ? 0.12 : beta,
+      init: false, t: 0,
+      p: [0, 0, 0],   // ENU-позиція, м
+      v: [0, 0, 0],   // швидкість, м/с
+      hist: []
+    };
+  }
+  function trackUpdate(tr, t, meas) {
+    if (!tr.init) {
+      tr.init = true; tr.t = t; tr.p = meas.slice(); tr.v = [0, 0, 0];
+      tr.hist = [{ t, p: meas.slice() }];
+      return tr;
+    }
+    const dt = clamp((t - tr.t) / 1000, 0.001, 5);
+    tr.t = t;
+    const pred = [tr.p[0] + tr.v[0] * dt, tr.p[1] + tr.v[1] * dt, tr.p[2] + tr.v[2] * dt];
+    const res = [meas[0] - pred[0], meas[1] - pred[1], meas[2] - pred[2]];
+    for (let i = 0; i < 3; i++) {
+      tr.p[i] = pred[i] + tr.alpha * res[i];
+      tr.v[i] = tr.v[i] + (tr.beta / dt) * res[i];
+    }
+    tr.hist.push({ t, p: tr.p.slice() });
+    if (tr.hist.length > 600) tr.hist.shift();
+    return tr;
+  }
+  /** Похідні параметри руху цілі */
+  function trackDerived(tr) {
+    const [pe, pn, pu] = tr.p, [ve, vn, vu] = tr.v;
+    const ground = hyp(pe, pn);
+    const slant = hyp(pe, pn, pu);
+    const speed = hyp(ve, vn);                 // шляхова, м/с
+    const heading = norm360(Math.atan2(ve, vn) * R2D);
+    const closing = slant > 1 ? -(pe * ve + pn * vn + pu * vu) / slant : 0;
+    const v2 = ve * ve + vn * vn + vu * vu;
+    let tcpa = null, dcpa = null;
+    if (v2 > 0.25) {
+      tcpa = -(pe * ve + pn * vn + pu * vu) / v2;
+      if (tcpa > 0) {
+        dcpa = hyp(pe + ve * tcpa, pn + vn * tcpa, pu + vu * tcpa);
+      } else { tcpa = null; }
+    }
+    return {
+      ground, slant, alt: pu, speed, speedKmh: speed * 3.6,
+      vertical: vu, heading, closing,
+      az: norm360(Math.atan2(pe, pn) * R2D),
+      el: slant > 1 ? Math.asin(clamp(pu / slant, -1, 1)) * R2D : 0,
+      tcpa, dcpa
+    };
+  }
+
+  /* ---------- 7. Обмін даними спостерігачів ------------------ */
+  /* Компактний рядок: NBK1|lat|lon|az|el|hhmmss  (диктується голосом) */
+  function encodeFix(fix) {
+    const p = [
+      'NBK1',
+      fix.lat.toFixed(5), fix.lon.toFixed(5),
+      norm360(fix.az).toFixed(1), fix.el.toFixed(1),
+      fix.alt == null ? '' : Math.round(fix.alt),
+      fix.ts == null ? '' : String(fix.ts).slice(-6)
+    ];
+    return p.join('|');
+  }
+  function decodeFix(str) {
+    if (!str) return null;
+    const p = String(str).trim().split('|');
+    if (p[0] !== 'NBK1' || p.length < 5) return null;
+    const lat = parseFloat(p[1]), lon = parseFloat(p[2]);
+    const az = parseFloat(p[3]), el = parseFloat(p[4]);
+    if (![lat, lon, az, el].every(isFinite)) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { lat, lon, az: norm360(az), el, alt: p[5] ? parseFloat(p[5]) : null, ts: p[6] || null };
+  }
+
+  /* ---------- 8. Каталог цілей ------------------------------ */
+  /* size — характерний розмір у метрах (розмах крила / довжина),
+     alt  — типовий діапазон висоти, м; spd — типова швидкість, км/год.
+     Цифри — відкриті довідкові, орієнтовні, редагуються в застосунку. */
+  const CATALOG = [
+    { id: 'shahed136', name: 'Shahed-136 / Гера́нь-2', size: 2.5, dim: 'розмах', alt: [500, 2500], spd: [150, 190], note: 'характерний гул 80–130 Гц' },
+    { id: 'shahed131', name: 'Shahed-131', size: 2.2, dim: 'розмах', alt: [500, 2500], spd: [150, 180], note: '' },
+    { id: 'gerbera', name: 'Гербера (імітатор)', size: 2.5, dim: 'розмах', alt: [500, 2000], spd: [120, 160], note: 'фанера, слабкий контраст' },
+    { id: 'lancet', name: 'Ланцет-3', size: 1.65, dim: 'розмах', alt: [100, 1500], spd: [80, 300], note: 'X-подібне оперення' },
+    { id: 'orlan10', name: 'Орлан-10', size: 3.1, dim: 'розмах', alt: [1000, 5000], spd: [90, 150], note: 'розвідник, кружляє' },
+    { id: 'zala421', name: 'ZALA 421-16', size: 2.8, dim: 'розмах', alt: [1000, 3500], spd: [65, 110], note: '' },
+    { id: 'supercam', name: 'SuperCam S350', size: 3.2, dim: 'розмах', alt: [500, 4000], spd: [65, 120], note: '' },
+    { id: 'eleron', name: 'Елерон-3', size: 1.47, dim: 'розмах', alt: [300, 3000], spd: [70, 130], note: '' },
+    { id: 'kh101', name: 'Х-101 / Х-555', size: 3.0, dim: 'розмах', alt: [30, 6000], spd: [700, 950], note: 'крилата, низько по рельєфу' },
+    { id: 'kalibr', name: 'Калібр 3М14', size: 3.1, dim: 'розмах', alt: [50, 150], spd: [700, 900], note: '' },
+    { id: 'kh59', name: 'Х-59 / Х-69', size: 1.3, dim: 'розмах', alt: [50, 1000], spd: [850, 1000], note: '' },
+    { id: 'fpv', name: 'FPV-дрон', size: 0.35, dim: 'по діагоналі', alt: [10, 500], spd: [60, 150], note: 'мала ціль, дальність <2 км' },
+    { id: 'mavic', name: 'Квадрокоптер (Mavic-клас)', size: 0.4, dim: 'по діагоналі', alt: [50, 1000], spd: [20, 70], note: '' },
+    { id: 'heli', name: 'Гелікоптер (Мі-8 клас)', size: 21.3, dim: 'ротор', alt: [50, 3000], spd: [150, 250], note: '' },
+    { id: 'jet', name: 'Літак (Су-25 клас)', size: 14.4, dim: 'розмах', alt: [100, 7000], spd: [500, 900], note: '' },
+    { id: 'airliner', name: 'Цивільний лайнер', size: 35.8, dim: 'розмах', alt: [8000, 12000], spd: [800, 900], note: 'висока інверсія' },
+    { id: 'balloon', name: 'Аеростат / метеозонд', size: 2.0, dim: 'діаметр', alt: [1000, 20000], spd: [0, 60], note: '' },
+    { id: 'bird', name: 'Птах', size: 1.2, dim: 'розмах', alt: [10, 1500], spd: [20, 80], note: 'найчастіша хибна ціль' },
+    { id: 'unknown', name: 'Невідома ціль', size: 2.5, dim: 'розмах', alt: [500, 3000], spd: [0, 900], note: 'розмір задається вручну' }
+  ];
+  const catalogById = id => CATALOG.find(c => c.id === id) || CATALOG[CATALOG.length - 1];
+
+  /** Підказка типу цілі за виміряними швидкістю/висотою */
+  function classify(speedKmh, altM) {
+    const out = [];
+    for (const c of CATALOG) {
+      if (c.id === 'unknown') continue;
+      let score = 0;
+      if (speedKmh != null && isFinite(speedKmh)) {
+        const [a, b] = c.spd;
+        score += speedKmh >= a * 0.7 && speedKmh <= b * 1.4 ? 1 : 0;
+      }
+      if (altM != null && isFinite(altM)) {
+        const [a, b] = c.alt;
+        score += altM >= a * 0.5 && altM <= b * 1.6 ? 1 : 0;
+      }
+      if (score > 0) out.push({ id: c.id, name: c.name, score });
+    }
+    return out.sort((x, y) => y.score - x.score).slice(0, 3);
+  }
+
+  /* ---------- 9. Форматери ---------------------------------- */
+  function fmtDist(m) {
+    if (m == null || !isFinite(m)) return '—';
+    if (m < 1000) return Math.round(m) + ' м';
+    if (m < 10000) return (m / 1000).toFixed(2) + ' км';
+    return (m / 1000).toFixed(1) + ' км';
+  }
+  function fmtPM(m, s) {
+    if (m == null || !isFinite(m)) return '—';
+    const rel = s / m;
+    const pm = s < 1000 ? Math.round(s / 10) * 10 + ' м' : (s / 1000).toFixed(1) + ' км';
+    return { value: fmtDist(m), pm, rel, grade: rel < 0.15 ? 'good' : rel < 0.35 ? 'mid' : 'bad' };
+  }
+  const fmtAz = a => (a == null || !isFinite(a)) ? '—' : norm360(a).toFixed(1).padStart(5, '0') + '°';
+  const AZ_NAMES = ['Пн', 'ПнСх', 'Сх', 'ПдСх', 'Пд', 'ПдЗх', 'Зх', 'ПнЗх'];
+  const azName = a => AZ_NAMES[Math.round(norm360(a) / 45) % 8];
+
+  return {
+    D2R, R2D, clamp, norm360, norm180, hyp,
+    rotMatrix, matVec, vecToAzEl, pixelToAzEl, pxToDeg, fovFromF, fFromFov,
+    EARTH_R, metersPerDegLat, metersPerDegLon, enuToLatLon, latLonToEnu, destPoint, bearingDist,
+    magDeclination, latLonToUtm, toMGRS, toDMS, toDM, latBand,
+    rangeBySize, rangeByAltitude, rangeByAcoustic, soundSpeed, triangulate, fuseRanges,
+    makeTrack, trackUpdate, trackDerived,
+    encodeFix, decodeFix,
+    CATALOG, catalogById, classify,
+    fmtDist, fmtPM, fmtAz, azName
+  };
+})();
+/* ── 20_state.js ── */
+/* ============================================================
+   Стан, сховище, дрібні утиліти
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.prototype.slice.call(document.querySelectorAll(s));
+const now = () => performance.now();
+const clamp = NBK.clamp, norm360 = NBK.norm360, norm180 = NBK.norm180;
+
+const DEFAULTS = {
+  fovMap: {},                 // {"1.0": {fov: 64.2, src: "gyro"}}
+  azOffset: 0, azZeroedAt: 0,
+  typeId: 'shahed136',
+  size: 2.5,
+  tAlt: 1500,
+  methods: { size: true, alt: true, acoustic: false, triang: false },
+  coordFmt: 'mgrs',
+  spdUnit: 'kmh',
+  night: false, analytic: false, extrapolate: true,
+  vibro: true, beep: true, wake: true,
+  sens: 3.2, minpx: 3, skyOnly: true, onnx: false,
+  gyroHold: true,
+  alpha: 0.55, beta: 0.12,
+  obsAlt: null, manualPos: false, manLat: null, manLon: null,
+  temp: 15
+};
+
+const S = {
+  running: false,
+  set: JSON.parse(JSON.stringify(DEFAULTS)),
+  me: { lat: null, lon: null, alt: null, acc: null, ts: 0 },
+  decl: null,
+  or: { alpha: 0, beta: 90, gamma: 0, abs: false, ok: false, t: 0 },
+  head: { az: 0, el: 0, roll: 0, quality: 0, jitter: 0 },
+  cam: { stream: null, track: null, w: 0, h: 0, zoom: 1, zoomCaps: null, ready: false },
+  fpx: 0, fovSrc: 'default',
+  tgt: null,                  // {x,y,w,h} у пікселях відео + службові поля
+  auto: false,
+  cands: [],
+  track: NBK.makeTrack(),
+  est: null,
+  ranges: [],
+  log: [],
+  audio: { ctx: null, an: null, data: null, peak: 0, level: 0, seeT: 0, hearT: 0, dt: 0, ok: false },
+  tri: { selfA: null, peer: null, result: null },
+  rec: null,
+  lastLockT: 0, lostSince: 0,
+  view: { scale: 1, ox: 0, oy: 0, dpr: 1, cw: 0, ch: 0 }
+};
+
+/* доступ ззовні: зручно для перевірок і для консолі браузера */
+try { window.S = S; window.NBK = NBK; } catch (e) { }
+
+/* ---------- сховище ---------- */
+function loadSet() {
+  try {
+    const raw = localStorage.getItem('nbk.set.v1');
+    if (raw) {
+      const o = JSON.parse(raw);
+      for (const k in DEFAULTS) if (k in o) S.set[k] = o[k];
+      S.set.methods = Object.assign({}, DEFAULTS.methods, o.methods || {});
+    }
+  } catch (e) { }
+  try { S.log = JSON.parse(localStorage.getItem('nbk.log.v1') || '[]'); } catch (e) { S.log = []; }
+}
+let saveT = 0;
+function saveSet() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    try { localStorage.setItem('nbk.set.v1', JSON.stringify(S.set)); } catch (e) { }
+  }, 250);
+}
+function saveLog() {
+  try { localStorage.setItem('nbk.log.v1', JSON.stringify(S.log.slice(-300))); } catch (e) { }
+}
+
+/* ---------- сурж-статуси ---------- */
+const SAY = {
+  camOk: ['камера ожила', 'око розплющилось', 'бачимо небо'],
+  camErr: ['камера не дала себе взяти', 'без камери тут глухо'],
+  gyroOk: ['гіра крутиться, азимут є', 'орієнтація на місці'],
+  gyroErr: ['гіроскоп мовчить як партизан'],
+  geoOk: ['точку свою знаємо', 'GPS зачепився'],
+  geoErr: ['GPS десь загубився, вводь руками'],
+  micOk: ['вуха підключили'],
+  lock: ['взяв на супровід', 'ціль у роботі', 'тримаю'],
+  lost: ['зірвалось, наводь заново', 'ціль злиняла'],
+  fix: ['записав у журнал', 'зафіксовано'],
+  needCal: ['спершу відкалібруй FOV, бо дальність буде фантастика'],
+  noPos: ['без своєї точки координати цілі не порахую']
+};
+const say = k => { const a = SAY[k]; return a ? a[Math.floor(Math.random() * a.length)] : k; };
+
+/* ---------- фідбек ---------- */
+function toast(msg, kind, ms) {
+  const t = document.createElement('div');
+  t.className = 'tst' + (kind ? ' ' + kind : '');
+  t.textContent = msg;
+  $('#toast').appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity .25s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 260); }, ms || 2400);
+  while ($('#toast').children.length > 3) $('#toast').firstChild.remove();
+}
+function vibro(pattern) {
+  if (!S.set.vibro || !navigator.vibrate) return;
+  try { navigator.vibrate(pattern); } catch (e) { }
+}
+let actx = null;
+function beep(freq, ms, vol) {
+  if (!S.set.beep) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.value = 0; o.connect(g); g.connect(actx.destination);
+    const t = actx.currentTime;
+    g.gain.linearRampToValueAtTime(vol == null ? 0.09 : vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (ms || 120) / 1000);
+    o.start(t); o.stop(t + (ms || 120) / 1000 + 0.02);
+  } catch (e) { }
+}
+
+/* ---------- дрібне ---------- */
+function fmtSpeed(ms) {
+  if (ms == null || !isFinite(ms)) return '—';
+  if (S.set.spdUnit === 'ms') return ms.toFixed(1);
+  if (S.set.spdUnit === 'kt') return (ms * 1.94384).toFixed(0);
+  return (ms * 3.6).toFixed(0);
+}
+const spdUnitLabel = () => S.set.spdUnit === 'ms' ? 'м/с' : S.set.spdUnit === 'kt' ? 'вуз' : 'км/год';
+
+function fmtCoord(lat, lon) {
+  if (lat == null || lon == null) return '—';
+  switch (S.set.coordFmt) {
+    case 'mgrs': return NBK.toMGRS(lat, lon, 5) || (lat.toFixed(5) + ' ' + lon.toFixed(5));
+    case 'dm': return NBK.toDM(lat, true) + ' ' + NBK.toDM(lon, false);
+    case 'dms': return NBK.toDMS(lat, true) + ' ' + NBK.toDMS(lon, false);
+    default: return lat.toFixed(5) + ', ' + lon.toFixed(5);
+  }
+}
+function myPos() {
+  if (S.set.manualPos && S.set.manLat != null && S.set.manLon != null)
+    return { lat: S.set.manLat, lon: S.set.manLon, alt: S.set.obsAlt || 0, manual: true };
+  if (S.me.lat == null) return null;
+  return { lat: S.me.lat, lon: S.me.lon, alt: S.set.obsAlt != null ? S.set.obsAlt : (S.me.alt || 0), manual: false };
+}
+function copyText(t) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(() => toast('скопійовано', 'good'), () => fallbackCopy(t));
+  } else fallbackCopy(t);
+}
+function fallbackCopy(t) {
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); toast('скопійовано', 'good'); } catch (e) { toast('не вийшло скопіювати', 'bad'); }
+  ta.remove();
+}
+function download(name, blobOrText, mime) {
+  const blob = blobOrText instanceof Blob ? blobOrText : new Blob([blobOrText], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1500);
+}
+function stamp(d) {
+  const p = n => String(n).padStart(2, '0');
+  const x = d || new Date();
+  return x.getFullYear() + p(x.getMonth() + 1) + p(x.getDate()) + '_' + p(x.getHours()) + p(x.getMinutes()) + p(x.getSeconds());
+}
+const hhmmss = d => { const p = n => String(n).padStart(2, '0'); const x = d || new Date(); return p(x.getHours()) + ':' + p(x.getMinutes()) + ':' + p(x.getSeconds()); };
+/* ── 30_sensors.js ── */
+/* ============================================================
+   Сенсори: камера, орієнтація, геолокація, wake lock
+   ============================================================ */
+
+/* ---------- камера ---------- */
+async function startCamera() {
+  const tries = [
+    { video: { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+    { video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false },
+    { video: true, audio: false }
+  ];
+  let err = null;
+  for (const c of tries) {
+    try {
+      const st = await navigator.mediaDevices.getUserMedia(c);
+      S.cam.stream = st;
+      S.cam.track = st.getVideoTracks()[0];
+      const v = $('#vid');
+      v.srcObject = st;
+      await v.play().catch(() => { });
+      await new Promise(r => {
+        if (v.videoWidth) return r();
+        v.onloadedmetadata = () => r();
+        setTimeout(r, 2500);
+      });
+      S.cam.w = v.videoWidth || 1280;
+      S.cam.h = v.videoHeight || 720;
+      S.cam.ready = true;
+      readCameraCaps();
+      return true;
+    } catch (e) { err = e; }
+  }
+  throw err || new Error('camera');
+}
+
+function readCameraCaps() {
+  const tr = S.cam.track;
+  S.cam.zoomCaps = null;
+  try {
+    const caps = tr.getCapabilities ? tr.getCapabilities() : null;
+    if (caps && caps.zoom) S.cam.zoomCaps = { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 };
+    // деякі рушії віддають кут поля зору напряму
+    const st = tr.getSettings ? tr.getSettings() : {};
+    if (st.zoom) S.cam.zoom = st.zoom;
+    if (caps && caps.fieldOfView && caps.fieldOfView.max) {
+      const fov = (caps.fieldOfView.max + caps.fieldOfView.min) / 2;
+      if (fov > 20 && fov < 120 && !S.set.fovMap[zoomKey()]) {
+        setFov(fov, 'api');
+      }
+    }
+  } catch (e) { }
+}
+async function setZoom(z) {
+  if (!S.cam.zoomCaps || !S.cam.track) return;
+  const v = clamp(z, S.cam.zoomCaps.min, S.cam.zoomCaps.max);
+  try { await S.cam.track.applyConstraints({ advanced: [{ zoom: v }] }); S.cam.zoom = v; applyFovForZoom(); }
+  catch (e) { toast('зум не приймається', 'warn'); }
+}
+const zoomKey = () => (Math.round(S.cam.zoom * 10) / 10).toFixed(1);
+
+/** Встановити фокусну для поточного зуму */
+function setFov(fovDeg, src) {
+  S.set.fovMap[zoomKey()] = { fov: fovDeg, src: src };
+  saveSet(); applyFovForZoom();
+}
+/** Підібрати f_px під поточний зум: точна калібровка або масштабована з іншої */
+function applyFovForZoom() {
+  const key = zoomKey();
+  const w = S.cam.w || 1280;
+  const exact = S.set.fovMap[key];
+  if (exact) { S.fpx = NBK.fFromFov(w, exact.fov); S.fovSrc = exact.src; return; }
+  // масштабуємо з найближчої відомої калібровки: f ∝ zoom
+  const keys = Object.keys(S.set.fovMap);
+  if (keys.length) {
+    let best = keys[0];
+    for (const k of keys) if (Math.abs(+k - S.cam.zoom) < Math.abs(+best - S.cam.zoom)) best = k;
+    const f0 = NBK.fFromFov(w, S.set.fovMap[best].fov);
+    S.fpx = f0 * (S.cam.zoom / (+best || 1));
+    S.fovSrc = 'scaled';
+    return;
+  }
+  // нічого нема — типове поле зору смартфонної основної камери
+  S.fpx = NBK.fFromFov(w, 66) * S.cam.zoom;
+  S.fovSrc = 'default';
+}
+
+/* ---------- орієнтація ---------- */
+let orientHandler = null;
+async function startOrientation() {
+  const need = typeof DeviceOrientationEvent !== 'undefined' &&
+    typeof DeviceOrientationEvent.requestPermission === 'function';
+  if (need) {
+    const r = await DeviceOrientationEvent.requestPermission();
+    if (r !== 'granted') throw new Error('denied');
+  }
+  return new Promise((resolve, reject) => {
+    let got = false;
+    orientHandler = ev => {
+      if (ev.alpha == null && ev.webkitCompassHeading == null) return;
+      S.or.t = now();
+      S.or.abs = !!ev.absolute || ev.webkitCompassHeading != null;
+      S.or.beta = ev.beta == null ? 90 : ev.beta;
+      S.or.gamma = ev.gamma == null ? 0 : ev.gamma;
+      if (ev.webkitCompassHeading != null) {
+        // iOS: heading — кут за годинниковою від півночі; alpha спеки — проти
+        S.or.alpha = norm360(360 - ev.webkitCompassHeading);
+        S.or.acc = ev.webkitCompassAccuracy;
+      } else {
+        S.or.alpha = norm360(ev.alpha);
+      }
+      S.or.ok = true;
+      if (!got) { got = true; resolve(true); }
+    };
+    window.addEventListener('deviceorientationabsolute', orientHandler, true);
+    window.addEventListener('deviceorientation', orientHandler, true);
+    setTimeout(() => { if (!got) reject(new Error('no-events')); }, 2500);
+  });
+}
+
+/* Комплементарний фільтр: гіроскоп веде, магнітометр повільно підтягує.
+   Тримаємо окремий «утриманий» азимут, щоб картинка не смикалась. */
+const HOLD = { az: null, lastRawAz: null, drift: 0, jitterBuf: [] };
+function fusedOrientation() {
+  const screenAngle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  const raw = NBK.pixelToAzEl(S.or, 0, 0, S.fpx || 1000, screenAngle);
+  let magAz = raw.az;
+  // джитер магнітометра — індикатор якості
+  if (HOLD.lastRawAz != null) {
+    const d = Math.abs(norm180(magAz - HOLD.lastRawAz));
+    HOLD.jitterBuf.push(d);
+    if (HOLD.jitterBuf.length > 30) HOLD.jitterBuf.shift();
+  }
+  HOLD.lastRawAz = magAz;
+  const jitter = HOLD.jitterBuf.length
+    ? HOLD.jitterBuf.reduce((a, b) => a + b, 0) / HOLD.jitterBuf.length : 0;
+
+  let az;
+  if (!S.set.gyroHold) { az = magAz; HOLD.az = magAz; }
+  else {
+    if (HOLD.az == null) HOLD.az = magAz;
+    const diff = norm180(magAz - HOLD.az);
+    // великий стрибок (>25°) — це реальний поворот, а не шум: наздоганяємо швидко
+    const k = Math.abs(diff) > 25 ? 0.5 : 0.045;
+    HOLD.az = norm360(HOLD.az + diff * k);
+    az = HOLD.az;
+  }
+  const decl = S.decl == null ? 0 : S.decl;
+  S.head.az = norm360(az + decl + S.set.azOffset);
+  S.head.el = raw.el;
+  S.head.jitter = jitter;
+  S.head.screenAngle = screenAngle;
+  S.head.magAz = magAz;
+  S.head.quality = !S.or.ok ? 0 : (jitter > 3 ? 1 : jitter > 1 ? 2 : 3);
+  return S.head;
+}
+/** Азимут/кут місця для точки кадру (у пікселях відео від центра) */
+function aimAt(dxVideo, dyVideo) {
+  const r = NBK.pixelToAzEl(S.or, dxVideo, dyVideo, S.fpx || 1000, S.head.screenAngle || 0);
+  const center = NBK.pixelToAzEl(S.or, 0, 0, S.fpx || 1000, S.head.screenAngle || 0);
+  // застосовуємо ту саму поправку, що й до центральної осі
+  const dAz = norm180(r.az - center.az);
+  return { az: norm360(S.head.az + dAz), el: r.el };
+}
+
+/* ---------- геолокація ---------- */
+let geoWatch = null;
+function startGeo() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('no-geo'));
+    let done = false;
+    geoWatch = navigator.geolocation.watchPosition(p => {
+      S.me.lat = p.coords.latitude; S.me.lon = p.coords.longitude;
+      S.me.acc = p.coords.accuracy;
+      if (p.coords.altitude != null) S.me.alt = p.coords.altitude;
+      S.me.ts = Date.now();
+      if (S.set.obsAlt == null && S.me.alt != null) S.set.obsAlt = Math.round(S.me.alt);
+      const d = NBK.magDeclination(S.me.lat, S.me.lon, new Date().getFullYear());
+      if (d != null) S.decl = d;
+      if (!done) { done = true; resolve(true); }
+    }, e => { if (!done) { done = true; reject(e); } },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+  });
+}
+
+/* ---------- мікрофон ---------- */
+async function startMic() {
+  const st = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+  });
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const src = ctx.createMediaStreamSource(st);
+  const an = ctx.createAnalyser();
+  an.fftSize = 4096; an.smoothingTimeConstant = 0.75;
+  src.connect(an);
+  S.audio.ctx = ctx; S.audio.an = an;
+  S.audio.data = new Uint8Array(an.frequencyBinCount);
+  S.audio.stream = st; S.audio.ok = true;
+  return true;
+}
+function pollAudio() {
+  const a = S.audio;
+  if (!a.ok || !a.an) return;
+  a.an.getByteFrequencyData(a.data);
+  const sr = a.ctx.sampleRate, bins = a.data.length;
+  const hzPerBin = sr / 2 / bins;
+  let best = 0, bestI = 0, sum = 0;
+  const lo = Math.max(1, Math.floor(40 / hzPerBin)), hi = Math.floor(400 / hzPerBin);
+  for (let i = lo; i < hi && i < bins; i++) {
+    sum += a.data[i];
+    if (a.data[i] > best) { best = a.data[i]; bestI = i; }
+  }
+  a.peak = bestI * hzPerBin;
+  a.peakLvl = best;
+  a.level = sum / Math.max(1, hi - lo);
+  a.hzPerBin = hzPerBin;
+}
+
+/* ---------- wake lock ---------- */
+let wl = null;
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator) { wl = await navigator.wakeLock.request('screen'); }
+    else if (wl) { await wl.release(); wl = null; }
+  } catch (e) { }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.set.wake && S.running) keepAwake(true);
+});
+/* ── 40_detect.js ── */
+/* ============================================================
+   Детекція та супровід
+   ── грубий прохід по небу шукає кандидатів,
+   ── точний прохід у нативній роздільності веде захоплену ціль
+   ============================================================ */
+
+const DET = {
+  W: 224, H: 126,
+  cv: document.createElement('canvas'),
+  ctx: null,
+  cur: null, bg: null, diff: null, mask: null,
+  ready: false, frames: 0
+};
+DET.ctx = DET.cv.getContext('2d', { willReadFrequently: true });
+
+const FINE = {
+  N: 96, P: 10,           // розмір кропу, півширина патча (патч 21×21)
+  SEARCH: 12,
+  cv: document.createElement('canvas'),
+  ctx: null, gray: null, patch: null
+};
+FINE.cv.width = FINE.cv.height = FINE.N;
+FINE.ctx = FINE.cv.getContext('2d', { willReadFrequently: true });
+FINE.gray = new Uint8ClampedArray(FINE.N * FINE.N);
+FINE.patch = new Uint8ClampedArray((2 * FINE.P + 1) * (2 * FINE.P + 1));
+
+function detInit() {
+  const v = $('#vid');
+  if (!v.videoWidth) return false;
+  DET.H = Math.max(60, Math.round(DET.W * v.videoHeight / v.videoWidth));
+  DET.cv.width = DET.W; DET.cv.height = DET.H;
+  const n = DET.W * DET.H;
+  DET.cur = new Uint8ClampedArray(n);
+  DET.bg = new Float32Array(n);
+  DET.diff = new Uint8ClampedArray(n);
+  DET.mask = new Uint8Array(n);
+  DET.frames = 0; DET.ready = true;
+  return true;
+}
+
+function grabCoarse() {
+  const v = $('#vid');
+  if (!DET.ready || !v.videoWidth) return false;
+  DET.ctx.drawImage(v, 0, 0, DET.W, DET.H);
+  const d = DET.ctx.getImageData(0, 0, DET.W, DET.H).data;
+  const n = DET.W * DET.H;
+  for (let i = 0, j = 0; i < n; i++, j += 4) {
+    DET.cur[i] = (d[j] * 77 + d[j + 1] * 151 + d[j + 2] * 28) >> 8;
+  }
+  if (DET.frames === 0) for (let i = 0; i < n; i++) DET.bg[i] = DET.cur[i];
+  DET.frames++;
+  return true;
+}
+
+/** Грубий пошук рухомих плям на небі */
+function detectCandidates() {
+  if (!grabCoarse()) return [];
+  const n = DET.W * DET.H, k = 0.055;
+  let sum = 0, sum2 = 0;
+  for (let i = 0; i < n; i++) {
+    const d = Math.abs(DET.cur[i] - DET.bg[i]);
+    DET.diff[i] = d > 255 ? 255 : d;
+    DET.bg[i] += (DET.cur[i] - DET.bg[i]) * k;
+    sum += d; sum2 += d * d;
+  }
+  if (DET.frames < 8) return [];
+  const mean = sum / n, sd = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+  const thr = Math.max(7, mean + S.set.sens * sd);
+
+  // маска з відсіканням землі за кутом місця
+  const horizonRow = S.set.skyOnly ? horizonRowInCoarse() : -1;
+  DET.mask.fill(0);
+  for (let y = 0; y < DET.H; y++) {
+    if (horizonRow >= 0 && y > horizonRow) break;
+    for (let x = 0; x < DET.W; x++) {
+      const i = y * DET.W + x;
+      if (DET.diff[i] > thr) DET.mask[i] = 1;
+    }
+  }
+
+  // зв'язні компоненти
+  const blobs = [], stack = new Int32Array(4096);
+  const minA = Math.max(1, Math.round(S.set.minpx * DET.W / 224));
+  for (let i = 0; i < n; i++) {
+    if (DET.mask[i] !== 1) continue;
+    let sp = 0; stack[sp++] = i; DET.mask[i] = 2;
+    let cnt = 0, sx = 0, sy = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+    while (sp > 0 && cnt < 3000) {
+      const p = stack[--sp];
+      const px = p % DET.W, py = (p / DET.W) | 0;
+      cnt++; sx += px; sy += py;
+      if (px < x0) x0 = px; if (px > x1) x1 = px;
+      if (py < y0) y0 = py; if (py > y1) y1 = py;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = px + dx, ny = py + dy;
+        if (nx < 0 || ny < 0 || nx >= DET.W || ny >= DET.H) continue;
+        const q = ny * DET.W + nx;
+        if (DET.mask[q] === 1 && sp < stack.length) { DET.mask[q] = 2; stack[sp++] = q; }
+      }
+    }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    const aspect = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
+    if (cnt < minA || cnt > 1200 || aspect > 7) continue;
+    blobs.push({ cx: sx / cnt, cy: sy / cnt, w: bw, h: bh, area: cnt });
+  }
+  return associate(blobs);
+}
+
+/** Рядок горизонту в координатах грубого буфера (нижче нього — земля) */
+function horizonRowInCoarse() {
+  const f = S.fpx || 1000;
+  const fCoarse = f * DET.W / (S.cam.w || 1280);
+  // кут місця осі камери; горизонт зміщений вниз на el градусів
+  const el = S.head.el || 0;
+  if (el <= 0) return -1;                     // камера дивиться вниз — не фільтруємо
+  const dy = Math.tan(el * NBK.D2R) * fCoarse;
+  const row = DET.H / 2 + dy;
+  return row < DET.H - 2 ? row : -1;
+}
+
+/** Асоціація кандидатів між кадрами */
+const TRACKS = [];
+function associate(blobs) {
+  const t = now();
+  const sx = (S.cam.w || 1280) / DET.W, sy = (S.cam.h || 720) / DET.H;
+  for (const b of blobs) {
+    let best = null, bd = 1e9;
+    for (const tr of TRACKS) {
+      const d = Math.hypot(tr.cx - b.cx, tr.cy - b.cy);
+      if (d < bd) { bd = d; best = tr; }
+    }
+    if (best && bd < 14) {
+      best.vx = (b.cx - best.cx) / Math.max(0.016, (t - best.t) / 1000);
+      best.vy = (b.cy - best.cy) / Math.max(0.016, (t - best.t) / 1000);
+      best.cx = b.cx; best.cy = b.cy; best.w = b.w; best.h = b.h;
+      best.area = b.area; best.t = t; best.age++; best.miss = 0;
+    } else {
+      TRACKS.push({ cx: b.cx, cy: b.cy, w: b.w, h: b.h, area: b.area, t, age: 1, miss: 0, vx: 0, vy: 0, id: Math.random().toString(36).slice(2, 7) });
+    }
+  }
+  for (let i = TRACKS.length - 1; i >= 0; i--) {
+    if (t - TRACKS[i].t > 400) { TRACKS[i].miss++; }
+    if (t - TRACKS[i].t > 1200) TRACKS.splice(i, 1);
+  }
+  if (TRACKS.length > 40) TRACKS.splice(0, TRACKS.length - 40);
+  return TRACKS.filter(tr => tr.age >= 3 && now() - tr.t < 350).map(tr => ({
+    id: tr.id,
+    x: tr.cx * sx, y: tr.cy * sy,
+    w: Math.max(tr.w * sx, 10), h: Math.max(tr.h * sy, 10),
+    speedPx: Math.hypot(tr.vx, tr.vy) * sx,
+    age: tr.age
+  })).sort((a, b) => b.age - a.age).slice(0, 6);
+}
+
+/* ---------- захоплення і супровід ---------- */
+function lockAt(vx, vy, hintW) {
+  S.tgt = {
+    x: vx, y: vy,
+    sizePx: hintW || 0, sizeRaw: hintW || 0,
+    conf: 1, lost: 0, t0: Date.now(), tLast: now(),
+    fixes: 0
+  };
+  S.track = NBK.makeTrack(S.set.alpha, S.set.beta);
+  S.ranges = []; S.est = null;
+  grabPatch();
+  measureSize();
+  S.lastLockT = now();
+  vibro([12, 40, 12]); beep(880, 90);
+  toast(say('lock'), 'good');
+  updateHint();
+}
+function unlock(quiet) {
+  S.tgt = null; S.track = NBK.makeTrack(S.set.alpha, S.set.beta);
+  S.ranges = []; S.est = null;
+  if (!quiet) { vibro(25); beep(320, 140); }
+  updateHint();
+}
+
+function fineCrop() {
+  const v = $('#vid'), t = S.tgt;
+  const half = FINE.N / 2;
+  const sx = clamp(t.x - half, 0, Math.max(0, S.cam.w - FINE.N));
+  const sy = clamp(t.y - half, 0, Math.max(0, S.cam.h - FINE.N));
+  FINE.ctx.drawImage(v, sx, sy, FINE.N, FINE.N, 0, 0, FINE.N, FINE.N);
+  const d = FINE.ctx.getImageData(0, 0, FINE.N, FINE.N).data;
+  for (let i = 0, j = 0; i < FINE.N * FINE.N; i++, j += 4)
+    FINE.gray[i] = (d[j] * 77 + d[j + 1] * 151 + d[j + 2] * 28) >> 8;
+  return { sx, sy, cx: t.x - sx, cy: t.y - sy };
+}
+
+function grabPatch() {
+  const c = fineCrop(), P = FINE.P, N = FINE.N;
+  const cx = Math.round(c.cx), cy = Math.round(c.cy);
+  let k = 0;
+  for (let dy = -P; dy <= P; dy++) for (let dx = -P; dx <= P; dx++) {
+    const x = clamp(cx + dx, 0, N - 1), y = clamp(cy + dy, 0, N - 1);
+    FINE.patch[k++] = FINE.gray[y * N + x];
+  }
+}
+
+/** Крок супроводу: SAD-пошук патча у вікні ±SEARCH */
+function trackStep() {
+  const t = S.tgt;
+  if (!t) return;
+  const c = fineCrop(), P = FINE.P, N = FINE.N, R = FINE.SEARCH;
+  const cx = Math.round(c.cx), cy = Math.round(c.cy);
+  let bestSad = Infinity, bx = 0, by = 0;
+  const side = 2 * P + 1;
+  for (let oy = -R; oy <= R; oy++) {
+    for (let ox = -R; ox <= R; ox++) {
+      const px = cx + ox, py = cy + oy;
+      if (px - P < 0 || py - P < 0 || px + P >= N || py + P >= N) continue;
+      let sad = 0, k = 0;
+      for (let dy = -P; dy <= P; dy++) {
+        const row = (py + dy) * N + px;
+        for (let dx = -P; dx <= P; dx++) {
+          const d = FINE.gray[row + dx] - FINE.patch[k++];
+          sad += d < 0 ? -d : d;
+          if (sad >= bestSad) { dx = P; dy = P; }
+        }
+      }
+      if (sad < bestSad) { bestSad = sad; bx = ox; by = oy; }
+    }
+  }
+  const norm = bestSad / (side * side * 255);
+  t.conf = clamp(1 - norm * 6, 0, 1);
+  if (norm > 0.16) {
+    t.lost++;
+    if (t.lost > 22) { toast(say('lost'), 'warn'); unlock(true); return; }
+  } else {
+    t.lost = 0;
+    t.x = clamp(c.sx + cx + bx, 2, S.cam.w - 2);
+    t.y = clamp(c.sy + cy + by, 2, S.cam.h - 2);
+    // м'яке оновлення еталона, щоб пережити зміну ракурсу
+    const c2 = fineCrop(), ncx = Math.round(c2.cx), ncy = Math.round(c2.cy);
+    let k = 0;
+    for (let dy = -P; dy <= P; dy++) for (let dx = -P; dx <= P; dx++) {
+      const x = clamp(ncx + dx, 0, N - 1), y = clamp(ncy + dy, 0, N - 1);
+      FINE.patch[k] = FINE.patch[k] * 0.86 + FINE.gray[y * N + x] * 0.14; k++;
+    }
+    measureSize();
+  }
+  t.tLast = now();
+}
+
+/** Кутовий розмір цілі в нативних пікселях кадру */
+function measureSize() {
+  const N = FINE.N, g = FINE.gray;
+  // фон — медіана рамки кропу
+  const border = [];
+  for (let i = 0; i < N; i++) { border.push(g[i], g[(N - 1) * N + i], g[i * N], g[i * N + N - 1]); }
+  border.sort((a, b) => a - b);
+  const bg = border[border.length >> 1];
+  const cx = N >> 1, cy = N >> 1;
+  let maxC = 0;
+  for (let y = cy - 14; y <= cy + 14; y++) for (let x = cx - 14; x <= cx + 14; x++) {
+    const d = Math.abs(g[y * N + x] - bg); if (d > maxC) maxC = d;
+  }
+  if (maxC < 9) { S.tgt.sizeConf = 0; return; }
+  const thr = Math.max(7, maxC * 0.38);
+  const seen = new Uint8Array(N * N), st = [cy * N + cx];
+  seen[cy * N + cx] = 1;
+  let x0 = cx, x1 = cx, y0 = cy, y1 = cy, cnt = 0;
+  while (st.length && cnt < 2600) {
+    const p = st.pop(), px = p % N, py = (p / N) | 0;
+    cnt++;
+    if (px < x0) x0 = px; if (px > x1) x1 = px;
+    if (py < y0) y0 = py; if (py > y1) y1 = py;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = px + dx, ny = py + dy;
+      if (nx < 1 || ny < 1 || nx >= N - 1 || ny >= N - 1) continue;
+      const q = ny * N + nx;
+      if (!seen[q] && Math.abs(g[q] - bg) > thr) { seen[q] = 1; st.push(q); }
+    }
+  }
+  const raw = Math.max(x1 - x0 + 1, y1 - y0 + 1);
+  if (raw >= N - 6) { S.tgt.sizeConf = 0; return; }  // пляма впирається в край — не вимір
+  S.tgt.sizeRaw = raw;
+  S.tgt.sizePx = S.tgt.sizePx > 0 ? S.tgt.sizePx * 0.7 + raw * 0.3 : raw;
+  S.tgt.sizeConf = clamp(maxC / 60, 0, 1);
+  S.tgt.blobW = x1 - x0 + 1; S.tgt.blobH = y1 - y0 + 1;
+}
+/* ── 50_calib.js ── */
+/* ============================================================
+   Калібрувальний майстер: FOV та обнулення азимута
+   ============================================================ */
+const CAL = { mode: null, step: 0, a: null, disc: { x: 0, y: 0, r: 40 }, drag: null, raf: 0 };
+
+function lookVector() {
+  const R = NBK.rotMatrix(S.or.alpha, S.or.beta, S.or.gamma);
+  return NBK.matVec(R, [0, 0, -1]);
+}
+const angBetween = (a, b) => {
+  const dot = clamp(a[0] * b[0] + a[1] * b[1] + a[2] * b[2], -1, 1);
+  return Math.acos(dot) * NBK.R2D;
+};
+
+function calibOpen(mode) {
+  CAL.mode = mode; CAL.step = 0; CAL.a = null;
+  document.body.classList.add('calibrating');
+  $('#calibView').classList.add('open');
+  const cv = $('#cvCanvas');
+  cv.width = Math.round(innerWidth * devicePixelRatio);
+  cv.height = Math.round(innerHeight * devicePixelRatio);
+  CAL.disc = { x: cv.width / 2, y: cv.height / 2, r: Math.min(cv.width, cv.height) * 0.09 };
+  calibText();
+  cancelAnimationFrame(CAL.raf);
+  const loop = () => { calibDraw(); CAL.raf = requestAnimationFrame(loop); };
+  loop();
+}
+function calibClose() {
+  cancelAnimationFrame(CAL.raf);
+  document.body.classList.remove('calibrating');
+  $('#calibView').classList.remove('open');
+  CAL.mode = null;
+}
+
+function calibText() {
+  const el = $('#cvTop'), act = $('#cvAct');
+  if (CAL.mode === 'gyro') {
+    if (CAL.step === 0) {
+      el.innerHTML = '<b>Калібровка по гіроскопу · крок 1 з 2</b><br>' +
+        'Знайди дрібний нерухомий орієнтир далеко від тебе — щоглу, трубу, край даху, яскраву зірку. ' +
+        'Наведи його точно в центральний хрест і не рухайся.';
+      act.textContent = 'МІТКА A';
+    } else {
+      el.innerHTML = '<b>Калібровка по гіроскопу · крок 2 з 2</b><br>' +
+        'Не змінюючи місця, поверни телефон так, щоб той самий орієнтир опинився рівно на правій мітці. ' +
+        'Тримай той самий нахил.';
+      act.textContent = 'МІТКА B';
+    }
+  } else if (CAL.mode === 'moon') {
+    el.innerHTML = '<b>Калібровка по диску</b><br>' +
+      'Наведи камеру на Місяць або Сонце (Сонце — тільки крізь темне скло, у кадр, не оком). ' +
+      'Перетягни коло на диск і зведи його точно по краях. Кутовий діаметр обох — 0.53°.';
+    act.textContent = 'ЗАСТОСУВАТИ';
+  }
+}
+
+function calibDraw() {
+  const cv = $('#cvCanvas'), g = cv.getContext('2d');
+  const W = cv.width, H = cv.height, dpr = devicePixelRatio;
+  g.clearRect(0, 0, W, H);
+  g.lineWidth = 2 * dpr;
+  const acc = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#3ddc84';
+  g.strokeStyle = acc; g.fillStyle = acc;
+
+  if (CAL.mode === 'gyro') {
+    // центральний хрест
+    const cx = W / 2, cy = H / 2, s = 22 * dpr;
+    g.beginPath();
+    g.moveTo(cx - s, cy); g.lineTo(cx - 6 * dpr, cy);
+    g.moveTo(cx + 6 * dpr, cy); g.lineTo(cx + s, cy);
+    g.moveTo(cx, cy - s); g.lineTo(cx, cy - 6 * dpr);
+    g.moveTo(cx, cy + 6 * dpr); g.lineTo(cx, cy + s);
+    g.stroke();
+    // права мітка
+    const mx = cx + W * 0.32;
+    g.globalAlpha = CAL.step === 1 ? 1 : 0.35;
+    g.beginPath();
+    g.moveTo(mx, cy - s); g.lineTo(mx, cy + s);
+    g.moveTo(mx - s, cy); g.lineTo(mx + s, cy);
+    g.stroke();
+    g.beginPath(); g.arc(mx, cy, 14 * dpr, 0, 7); g.stroke();
+    g.globalAlpha = 1;
+    if (CAL.a) {
+      const d = angBetween(CAL.a.v, lookVector());
+      g.font = (13 * dpr) + 'px ui-monospace,monospace';
+      g.fillText('Δ ' + d.toFixed(2) + '°', cx + 14 * dpr, cy - 30 * dpr);
+    }
+  } else if (CAL.mode === 'moon') {
+    const d = CAL.disc;
+    g.beginPath(); g.arc(d.x, d.y, d.r, 0, 7); g.stroke();
+    g.setLineDash([4 * dpr, 6 * dpr]);
+    g.beginPath(); g.arc(d.x, d.y, d.r + 12 * dpr, 0, 7); g.stroke();
+    g.setLineDash([]);
+    // ручка зміни радіуса
+    g.beginPath(); g.arc(d.x + d.r, d.y, 15 * dpr, 0, 7); g.fill();
+    g.font = (13 * dpr) + 'px ui-monospace,monospace';
+    const dv = (2 * d.r / dpr) * (S.cam.w / Math.max(1, S.view.cw));
+    g.fillText('⌀ ' + (2 * d.r / dpr).toFixed(0) + ' px екрана', d.x - 60 * dpr, d.y - d.r - 18 * dpr);
+    g.fillText('≈ ' + dv.toFixed(0) + ' px кадру', d.x - 60 * dpr, d.y - d.r - 2 * dpr);
+  }
+}
+
+function calibAct() {
+  if (CAL.mode === 'gyro') {
+    if (CAL.step === 0) {
+      CAL.a = { v: lookVector() };
+      CAL.step = 1; calibText(); vibro(15); beep(660, 70);
+      return;
+    }
+    const b = lookVector();
+    const dAng = angBetween(CAL.a.v, b);
+    if (dAng < 2) { toast('поворот замалий, крутни більше', 'warn'); return; }
+    if (dAng > 45) { toast('поворот завеликий, орієнтир мав лишитись у кадрі', 'warn'); return; }
+    const cv = $('#cvCanvas');
+    const dxScreen = (cv.width * 0.32) / devicePixelRatio;         // CSS-пікселі
+    const dxVideo = dxScreen / (S.view.scale || 1);                // нативні пікселі кадру
+    const f = dxVideo / Math.tan(dAng * NBK.D2R);
+    const fov = NBK.fovFromF(S.cam.w, f);
+    if (!(fov > 15 && fov < 120)) { toast('вийшла дурня, спробуй ще раз повільніше', 'bad'); CAL.step = 0; calibText(); return; }
+    setFov(fov, 'gyro');
+    toast('FOV ' + fov.toFixed(1) + '° записано', 'good');
+    vibro([10, 40, 10, 40, 10]); beep(990, 120);
+    calibClose(); refreshCalibTab();
+  } else if (CAL.mode === 'moon') {
+    const dScreenCss = 2 * CAL.disc.r / devicePixelRatio;
+    const dVideo = dScreenCss / (S.view.scale || 1);
+    if (dVideo < 3) { toast('коло замале, зведи точніше по краю диска', 'warn'); return; }
+    const f = (dVideo / 2) / Math.tan(0.265 * NBK.D2R);
+    const fov = NBK.fovFromF(S.cam.w, f);
+    if (!(fov > 15 && fov < 120)) { toast('не сходиться, перевір коло', 'bad'); return; }
+    setFov(fov, 'диск');
+    toast('FOV ' + fov.toFixed(1) + '° записано', 'good');
+    vibro([10, 40, 10]); beep(990, 120);
+    calibClose(); refreshCalibTab();
+  }
+}
+
+/* перетягування диска */
+function calibPointer(ev, kind) {
+  if (CAL.mode !== 'moon') return;
+  const cv = $('#cvCanvas'), r = cv.getBoundingClientRect(), dpr = devicePixelRatio;
+  const x = (ev.clientX - r.left) * dpr, y = (ev.clientY - r.top) * dpr;
+  const d = CAL.disc;
+  if (kind === 'down') {
+    CAL.drag = Math.hypot(x - (d.x + d.r), y - d.y) < 34 * dpr ? 'r' : 'move';
+  } else if (kind === 'move' && CAL.drag) {
+    if (CAL.drag === 'r') d.r = clamp(Math.hypot(x - d.x, y - d.y), 5 * dpr, Math.min(cv.width, cv.height) * 0.45);
+    else { d.x = x; d.y = y; }
+  } else if (kind === 'up') CAL.drag = null;
+}
+
+/* ---------- обнулення азимута по орієнтиру ---------- */
+function openRefZero() {
+  const cur = S.head.az;
+  openModal(`
+    <h3>Обнулення по орієнтиру</h3>
+    <p>Наведи центральний хрест точно на орієнтир з відомим напрямком і задай його істинний азимут — або координати, якщо знаєш їх.</p>
+    <div class="kv"><span>Поточний азимут осі</span><span>${NBK.fmtAz(cur)}</span></div>
+    <div class="sect">Відомий азимут орієнтира</div>
+    <input type="number" id="m-az" step="0.1" placeholder="напр. 127.5" style="width:100%">
+    <div class="sect">або координати орієнтира</div>
+    <div class="grid2">
+      <input type="number" id="m-lat" step="0.00001" placeholder="широта">
+      <input type="number" id="m-lon" step="0.00001" placeholder="довгота">
+    </div>
+    <div class="mrow">
+      <button class="btn" id="m-ok">Застосувати</button>
+      <button class="btn ghost" id="m-cancel" style="max-width:110px">Відміна</button>
+    </div>`);
+  $('#m-cancel').onclick = closeModal;
+  $('#m-ok').onclick = () => {
+    let known = parseFloat($('#m-az').value);
+    const la = parseFloat($('#m-lat').value), lo = parseFloat($('#m-lon').value);
+    const me = myPos();
+    if (!isFinite(known) && isFinite(la) && isFinite(lo)) {
+      if (!me) { toast(say('noPos'), 'bad'); return; }
+      known = NBK.bearingDist(me.lat, me.lon, la, lo).az;
+    }
+    if (!isFinite(known)) { toast('нема ні азимута, ні координат', 'warn'); return; }
+    const base = norm360(S.head.az - S.set.azOffset);
+    S.set.azOffset = clamp(norm180(known - base), -60, 60);
+    S.set.azZeroedAt = Date.now();
+    saveSet(); closeModal(); refreshCalibTab();
+    toast('поправка ' + S.set.azOffset.toFixed(1) + '°', 'good');
+    vibro(20);
+  };
+}
+
+/* ---------- модалка ---------- */
+function openModal(html) { $('#mbox').innerHTML = html; $('#modal').classList.add('open'); }
+function closeModal() { $('#modal').classList.remove('open'); }
+/* ── 60_solve.js ── */
+/* ============================================================
+   Розв'язувач: дальність, фузія, кінематика, координати
+   ============================================================ */
+
+/* Похибка азимута. Магнітометр телефона без обнулення по орієнтиру систематично
+   бреше більше, ніж показує його ж джитер — тому базу тримаємо чесно високою. */
+const azErrDeg = () => clamp(
+  (S.set.azZeroedAt && Date.now() - S.set.azZeroedAt < 3 * 3600e3 ? 2.0 : 4.5)
+  + S.head.jitter * 1.2, 2.0, 20);
+const elErrDeg = () => clamp(0.8 + S.head.jitter * 0.25, 0.8, 4);
+
+function targetAim() {
+  if (!S.tgt) return null;
+  return aimAt(S.tgt.x - S.cam.w / 2, S.tgt.y - S.cam.h / 2);
+}
+
+function computeRanges() {
+  const out = [];
+  const t = S.tgt;
+  if (!t) return out;
+  const aim = targetAim();
+  const me = myPos();
+  const cat = NBK.catalogById(S.set.typeId);
+  const m = S.set.methods;
+
+  /* за кутовим розміром */
+  if (m.size) {
+    if (t.sizePx > 1 && t.sizeConf > 0.1) {
+      const rel = S.fovSrc === 'gyro' || S.fovSrc === 'диск' ? 0.20
+        : S.fovSrc === 'api' ? 0.26 : S.fovSrc === 'scaled' ? 0.30 : 0.38;
+      const r = NBK.rangeBySize(S.set.size, t.sizePx, S.fpx, { sizeRel: rel, pxErr: 1.5 });
+      if (r) { r.label = 'за розміром'; r.detail = t.sizePx.toFixed(1) + ' px · f' + Math.round(S.fpx); out.push(r); }
+    } else {
+      out.push({ skip: true, label: 'за розміром', why: 'ціль надто слабко контрастує з небом' });
+    }
+  }
+
+  /* за висотою і кутом місця */
+  if (m.alt && aim) {
+    const obs = me ? (me.alt || 0) : 0;
+    const spread = Math.max(200, (cat.alt[1] - cat.alt[0]) * 0.35);
+    const r = NBK.rangeByAltitude(S.set.tAlt, obs, aim.el, { altErr: spread, elErr: elErrDeg() });
+    if (r) { r.label = 'за висотою'; r.detail = 'H' + S.set.tAlt + ' · ε' + aim.el.toFixed(1) + '°'; out.push(r); }
+    else out.push({ skip: true, label: 'за висотою', why: aim.el < 1 ? 'кут місця менший за 1°' : 'ціль не вище спостерігача' });
+  }
+
+  /* акустика */
+  if (m.acoustic) {
+    if (S.audio.dt > 0 && Date.now() - S.audio.dtAt < 90000) {
+      const r = NBK.rangeByAcoustic(S.audio.dt, S.set.temp);
+      if (r) { r.label = 'по звуку'; r.detail = 'Δt ' + S.audio.dt.toFixed(1) + ' с'; out.push(r); }
+    } else out.push({ skip: true, label: 'по звуку', why: 'нема свіжого заміру затримки' });
+  }
+
+  /* тріангуляція */
+  if (m.triang) {
+    const tr = S.tri.result;
+    if (tr && Date.now() - tr.at < 180000) {
+      out.push({ r: tr.r, sigma: tr.sigma, method: 'triang', label: 'тріангуляція', detail: 'база ' + Math.round(tr.baseline) + ' м · кут ' + tr.crossDeg.toFixed(0) + '°' });
+    } else out.push({ skip: true, label: 'тріангуляція', why: 'нема свіжого перетину' });
+  }
+
+  return out;
+}
+
+function solveStep() {
+  if (!S.tgt) {
+    S.ranges = []; S.est = null;
+    S.aim = null; S.der = null; S.tgtPos = null; S.tgtFuture = null;
+    return;
+  }
+  S.ranges = computeRanges();
+  const usable = S.ranges.filter(r => !r.skip);
+  S.est = NBK.fuseRanges(usable);
+  if (!S.est) return;
+
+  const aim = targetAim();
+  const me = myPos();
+  const r = S.est.r, elR = aim.el * NBK.D2R, azR = aim.az * NBK.D2R;
+  const horiz = r * Math.cos(elR);
+  const e = horiz * Math.sin(azR), n = horiz * Math.cos(azR);
+  const u = r * Math.sin(elR) + (me ? (me.alt || 0) : 0);
+  NBK.trackUpdate(S.track, Date.now(), [e, n, u]);
+  S.der = NBK.trackDerived(S.track);
+  S.aim = aim;
+  if (me) {
+    const p = NBK.enuToLatLon(me.lat, me.lon, S.track.p[0], S.track.p[1]);
+    S.tgtPos = { lat: p.lat, lon: p.lon, alt: S.track.p[2] };
+    if (S.set.extrapolate && S.der.speed > 3) {
+      const f = NBK.enuToLatLon(me.lat, me.lon, S.track.p[0] + S.track.v[0] * 60, S.track.p[1] + S.track.v[1] * 60);
+      S.tgtFuture = f;
+    } else S.tgtFuture = null;
+  } else { S.tgtPos = null; S.tgtFuture = null; }
+}
+
+/* ---------- журнал ---------- */
+function addFix() {
+  if (!S.tgt || !S.est) { toast('нема на чому фіксувати — спершу захопи ціль', 'warn'); return; }
+  const me = myPos();
+  const d = S.der || {};
+  const cat = NBK.catalogById(S.set.typeId);
+  const rec = {
+    t: Date.now(),
+    type: S.set.typeId, typeName: cat.name,
+    az: S.aim ? S.aim.az : null, el: S.aim ? S.aim.el : null,
+    range: S.est.r, sigma: S.est.sigma, methods: S.est.used,
+    speed: d.speed || 0, heading: d.heading || 0, alt: d.alt || 0,
+    closing: d.closing || 0, dcpa: d.dcpa || null, tcpa: d.tcpa || null,
+    me: me ? { lat: me.lat, lon: me.lon, alt: me.alt } : null,
+    pos: S.tgtPos ? { lat: S.tgtPos.lat, lon: S.tgtPos.lon, alt: S.tgtPos.alt } : null,
+    azErr: azErrDeg(), fov: NBK.fovFromF(S.cam.w, S.fpx), fovSrc: S.fovSrc
+  };
+  S.log.push(rec); saveLog();
+  S.tgt.fixes++;
+  vibro([8, 30, 8]); beep(1180, 80);
+  toast(say('fix') + ' · ' + NBK.fmtDist(rec.range), 'good');
+  renderLog();
+}
+
+function exportLog(fmt) {
+  if (!S.log.length) { toast('журнал порожній', 'warn'); return; }
+  const name = 'neboskop_' + stamp();
+  if (fmt === 'json') {
+    download(name + '.json', JSON.stringify({ app: 'НЕБОСКОП', v: 1, exported: new Date().toISOString(), fixes: S.log }, null, 2), 'application/json');
+  } else if (fmt === 'csv') {
+    const head = ['час_utc', 'тип', 'азимут', 'кут_місця', 'дальність_м', 'похибка_м', 'методи', 'швидкість_кмг', 'курс', 'висота_м', 'зближення_мс', 'ціль_шир', 'ціль_дов', 'мій_шир', 'мій_дов', 'mgrs'];
+    const rows = S.log.map(r => [
+      new Date(r.t).toISOString(), r.typeName,
+      r.az == null ? '' : r.az.toFixed(1), r.el == null ? '' : r.el.toFixed(1),
+      Math.round(r.range), Math.round(r.sigma), (r.methods || []).join('+'),
+      (r.speed * 3.6).toFixed(0), r.heading.toFixed(0), Math.round(r.alt), r.closing.toFixed(1),
+      r.pos ? r.pos.lat.toFixed(6) : '', r.pos ? r.pos.lon.toFixed(6) : '',
+      r.me ? r.me.lat.toFixed(6) : '', r.me ? r.me.lon.toFixed(6) : '',
+      r.pos ? (NBK.toMGRS(r.pos.lat, r.pos.lon, 5) || '') : ''
+    ]);
+    const csv = '﻿' + [head].concat(rows).map(r => r.map(c => /[",;\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(';')).join('\n');
+    download(name + '.csv', csv, 'text/csv;charset=utf-8');
+  } else if (fmt === 'geojson') {
+    const fc = {
+      type: 'FeatureCollection', features: S.log.filter(r => r.pos).map(r => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [+r.pos.lon.toFixed(6), +r.pos.lat.toFixed(6), Math.round(r.pos.alt)] },
+        properties: {
+          time: new Date(r.t).toISOString(), type: r.typeName,
+          range_m: Math.round(r.range), sigma_m: Math.round(r.sigma),
+          bearing: r.az, elevation: r.el, speed_kmh: +(r.speed * 3.6).toFixed(0),
+          heading: +r.heading.toFixed(0), alt_m: Math.round(r.alt), methods: (r.methods || []).join('+')
+        }
+      }))
+    };
+    download(name + '.geojson', JSON.stringify(fc), 'application/geo+json');
+  } else if (fmt === 'kml') {
+    const pm = S.log.filter(r => r.pos).map(r =>
+      `  <Placemark><name>${esc(r.typeName)} ${hhmmss(new Date(r.t))}</name>` +
+      `<description>Дальність ${Math.round(r.range)}±${Math.round(r.sigma)} м, азимут ${r.az == null ? '—' : r.az.toFixed(1)}°, ` +
+      `швидкість ${(r.speed * 3.6).toFixed(0)} км/год, курс ${r.heading.toFixed(0)}°</description>` +
+      `<Point><altitudeMode>absolute</altitudeMode><coordinates>${r.pos.lon.toFixed(6)},${r.pos.lat.toFixed(6)},${Math.round(r.pos.alt)}</coordinates></Point></Placemark>`
+    ).join('\n');
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>НЕБОСКОП ${stamp()}</name>\n${pm}\n</Document></kml>`;
+    download(name + '.kml', kml, 'application/vnd.google-earth.kml+xml');
+  }
+}
+const esc = s => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+/* ---------- тріангуляція ---------- */
+function myFixString() {
+  const me = myPos();
+  if (!me) return null;
+  const aim = S.tgt ? targetAim() : { az: S.head.az, el: S.head.el };
+  return NBK.encodeFix({ lat: me.lat, lon: me.lon, az: aim.az, el: aim.el, alt: me.alt, ts: stamp().replace('_', '') });
+}
+function triApplyPeer(str) {
+  const peer = NBK.decodeFix(str);
+  if (!peer) { $('#tri-out').innerHTML = '<b>Рядок не розпізнано.</b> Має починатись із NBK1 і містити п\'ять полів через вертикальну риску.'; return; }
+  const me = myPos();
+  if (!me) { $('#tri-out').textContent = 'Нема власної точки — увімкни GPS або задай координати вручну.'; return; }
+  const aim = S.tgt ? targetAim() : { az: S.head.az, el: S.head.el };
+  const res = NBK.triangulate(me, peer, aim.az, peer.az, azErrDeg());
+  if (!res) { $('#tri-out').innerHTML = '<b>Перетину нема.</b> Пеленги майже паралельні, база замала або ціль позаду одного зі спостерігачів.'; return; }
+  res.at = Date.now(); S.tri.result = res; S.tri.peer = peer;
+  S.set.methods.triang = true; syncMethodSwitches(); saveSet();
+  $('#tri-out').innerHTML = triReport(res);
+  vibro(20); toast('перетин: ' + NBK.fmtDist(res.r), 'good');
+}
+function triReport(res) {
+  const q = res.crossDeg < 15 ? '<b>кут перетину малий — похибка велика</b>' :
+    res.crossDeg > 40 ? 'геометрія добра' : 'геометрія прийнятна';
+  return `Дальність <span class="mono">${NBK.fmtDist(res.r)} ± ${NBK.fmtDist(res.sigma)}</span><br>` +
+    `Точка: <span class="mono">${fmtCoord(res.lat, res.lon)}</span><br>` +
+    `База ${Math.round(res.baseline)} м, кут перетину ${res.crossDeg.toFixed(1)}° — ${q}`;
+}
+function triMarkSelf() {
+  const me = myPos();
+  if (!me) { toast(say('noPos'), 'bad'); return; }
+  const aim = S.tgt ? targetAim() : { az: S.head.az, el: S.head.el };
+  S.tri.selfA = { lat: me.lat, lon: me.lon, az: aim.az, el: aim.el, at: Date.now() };
+  $('#tri-self').innerHTML = `Точка A взята: <span class="mono">${fmtCoord(me.lat, me.lon)}</span>, азимут <span class="mono">${NBK.fmtAz(aim.az)}</span>.<br>Пройди 50–200 м убік від напрямку на ціль і замкни в точці B.`;
+  vibro(15); beep(700, 70);
+}
+function triSolveSelf() {
+  const A = S.tri.selfA;
+  if (!A) { toast('спершу зафіксуй точку A', 'warn'); return; }
+  const me = myPos();
+  if (!me) { toast(say('noPos'), 'bad'); return; }
+  const aim = S.tgt ? targetAim() : { az: S.head.az, el: S.head.el };
+  const res = NBK.triangulate({ lat: me.lat, lon: me.lon }, A, aim.az, A.az, azErrDeg());
+  if (!res) { $('#tri-self').innerHTML = '<b>Не сходиться.</b> Замала база між точками або пеленги майже однакові — відійди далі вбік.'; return; }
+  res.at = Date.now(); S.tri.result = res;
+  S.set.methods.triang = true; syncMethodSwitches(); saveSet();
+  $('#tri-self').innerHTML = triReport(res) +
+    '<br><span style="color:var(--warn)">Метод коректний лише якщо ціль майже не змістилась між замірами.</span>';
+  vibro(20);
+}
+/* ── 70_render.js ── */
+/* ============================================================
+   Візуалізація: оверлей, компасна лінійка, мінікарта, спектр
+   ============================================================ */
+function cssVar(n, f) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  return v || f;
+}
+function sizeCanvas(c, cssW, cssH) {
+  const dpr = Math.min(devicePixelRatio || 1, 2.5);
+  const w = Math.round(cssW * dpr), h = Math.round(cssH * dpr);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  return dpr;
+}
+function updateView() {
+  const c = $('#ov'), r = c.getBoundingClientRect();
+  const dpr = sizeCanvas(c, r.width, r.height);
+  const vw = S.cam.w || 1280, vh = S.cam.h || 720;
+  const scale = Math.max(r.width / vw, r.height / vh);
+  S.view = {
+    dpr, cw: r.width, ch: r.height, scale,
+    ox: (r.width - vw * scale) / 2, oy: (r.height - vh * scale) / 2
+  };
+}
+const v2s = (x, y) => ({ x: S.view.ox + x * S.view.scale, y: S.view.oy + y * S.view.scale });
+const s2v = (x, y) => ({ x: (x - S.view.ox) / S.view.scale, y: (y - S.view.oy) / S.view.scale });
+
+function drawOverlay() {
+  const c = $('#ov'), g = c.getContext('2d'), d = S.view.dpr;
+  g.setTransform(d, 0, 0, d, 0, 0);
+  g.clearRect(0, 0, S.view.cw, S.view.ch);
+  // тінь — щоб HUD читався і на яскравому небі, і на хмарі
+  g.shadowColor = 'rgba(0,0,0,.75)'; g.shadowBlur = 4;
+  const acc = cssVar('--acc', '#3ddc84'), dim = cssVar('--dim', '#5e7568'),
+    warn = cssVar('--warn', '#f5b83d'), bad = cssVar('--bad', '#ff5a4e');
+
+  /* лінія горизонту */
+  if (S.set.skyOnly && S.head.el > 0.5) {
+    const fS = S.fpx * S.view.scale;
+    const yc = S.view.oy + (S.cam.h / 2) * S.view.scale;
+    const y = yc + Math.tan(S.head.el * NBK.D2R) * fS;
+    if (y > 0 && y < S.view.ch - 130) {
+      g.save(); g.strokeStyle = dim; g.globalAlpha = .5; g.setLineDash([6, 8]); g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, y); g.lineTo(S.view.cw, y); g.stroke();
+      g.setLineDash([]); g.globalAlpha = .7; g.font = '10px ui-monospace,monospace';
+      g.fillStyle = dim; g.fillText('горизонт', 8, y - 6); g.restore();
+    }
+  }
+
+  /* центральний хрест */
+  const cx = S.view.cw / 2, cy = S.view.ch / 2;
+  g.save(); g.globalAlpha = S.tgt ? .3 : .6; g.strokeStyle = acc; g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(cx - 16, cy); g.lineTo(cx - 5, cy); g.moveTo(cx + 5, cy); g.lineTo(cx + 16, cy);
+  g.moveTo(cx, cy - 16); g.lineTo(cx, cy - 5); g.moveTo(cx, cy + 5); g.lineTo(cx, cy + 16);
+  g.stroke(); g.restore();
+
+  /* кандидати */
+  if (S.auto) {
+    g.save(); g.strokeStyle = warn; g.lineWidth = 1.2; g.setLineDash([3, 3]);
+    g.font = '10px ui-monospace,monospace'; g.fillStyle = warn;
+    for (const cd of S.cands) {
+      const p = v2s(cd.x, cd.y);
+      const w = Math.max(26, cd.w * S.view.scale + 14), h = Math.max(26, cd.h * S.view.scale + 14);
+      g.strokeRect(p.x - w / 2, p.y - h / 2, w, h);
+      g.fillText(cd.age > 12 ? 'стійкий' : 'кандидат', p.x - w / 2, p.y - h / 2 - 5);
+    }
+    g.restore();
+  }
+
+  /* захоплена ціль */
+  if (S.tgt) {
+    const p = v2s(S.tgt.x, S.tgt.y);
+    const blob = Math.max(S.tgt.sizePx || 12, 10) * S.view.scale;
+    const b = clamp(blob * 1.9 + 26, 44, 190) / 2;
+    const col = S.tgt.lost > 6 ? warn : acc;
+    g.save(); g.strokeStyle = col; g.lineWidth = 2; g.lineCap = 'round';
+    const L = b * 0.42;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {
+      g.beginPath();
+      g.moveTo(p.x + sx * b - sx * L, p.y + sy * b);
+      g.lineTo(p.x + sx * b, p.y + sy * b);
+      g.lineTo(p.x + sx * b, p.y + sy * b - sy * L);
+      g.stroke();
+    });
+    // внутрішня рамка по виміряній плямі
+    if (S.tgt.sizeConf > 0.1) {
+      g.globalAlpha = .55; g.lineWidth = 1; g.setLineDash([2, 3]);
+      const bw = (S.tgt.blobW || 8) * S.view.scale, bh = (S.tgt.blobH || 8) * S.view.scale;
+      g.strokeRect(p.x - bw / 2, p.y - bh / 2, bw, bh);
+      g.setLineDash([]); g.globalAlpha = 1;
+    }
+    // підпис
+    g.font = '600 12px ui-monospace,monospace'; g.fillStyle = col;
+    const lines = [];
+    if (S.est) lines.push(NBK.fmtDist(S.est.r) + ' ±' + NBK.fmtDist(S.est.sigma));
+    if (S.aim) lines.push(NBK.fmtAz(S.aim.az) + ' / ' + S.aim.el.toFixed(1) + '°');
+    if (S.der && S.der.speed > 2) lines.push(fmtSpeed(S.der.speed) + ' ' + spdUnitLabel());
+    // підпис праворуч від рамки, а якщо там край чи бічна панель — ліворуч
+    const rightLimit = S.view.cw - (document.body.classList.contains('analytic')
+      ? Math.min(S.view.cw * 0.44, 290) : 0) - 8;
+    const widest = lines.reduce((m, l) => Math.max(m, g.measureText(l).width), 0);
+    const toLeft = p.x + b + 8 + widest > rightLimit;
+    g.textAlign = toLeft ? 'right' : 'left';
+    const lx = toLeft ? p.x - b - 8 : p.x + b + 8;
+    let ty = p.y - b - 8 - (lines.length - 1) * 14;
+    for (const ln of lines) { g.fillText(ln, lx, ty); ty += 14; }
+    g.textAlign = 'left';
+    // смуга впевненості супроводу
+    g.fillStyle = S.tgt.conf > .5 ? acc : warn; g.globalAlpha = .8;
+    g.fillRect(p.x - b, p.y + b + 7, 2 * b * clamp(S.tgt.conf, 0, 1), 2);
+    g.globalAlpha = 1; g.restore();
+  }
+
+  /* попередження про калібровку */
+  if (S.fovSrc === 'default' && S.set.methods.size) {
+    g.save(); g.font = '11px ui-monospace,monospace'; g.fillStyle = warn; g.globalAlpha = .85;
+    g.fillText('FOV не калібровано — дальність за розміром орієнтовна', 10, S.view.ch - 10);
+    g.restore();
+  }
+}
+
+/* ---------- компасна лінійка ---------- */
+function drawRuler() {
+  const c = $('#ruler'), r = c.getBoundingClientRect();
+  if (!r.width) return;
+  const d = sizeCanvas(c, r.width, r.height);
+  const g = c.getContext('2d');
+  g.setTransform(d, 0, 0, d, 0, 0);
+  g.clearRect(0, 0, r.width, r.height);
+  const span = 80, ppd = r.width / span, az = S.head.az;
+  const acc = cssVar('--acc', '#3ddc84'), txt = cssVar('--txt2', '#8fa89a'), dim = cssVar('--dim', '#5e7568');
+  g.font = '600 12px ui-monospace,monospace';
+  const center = NBK.fmtAz(az) + ' ' + NBK.azName(az);
+  const cw = g.measureText(center).width + 12;
+  g.font = '10px ui-monospace,monospace'; g.textAlign = 'center';
+  const start = Math.floor((az - span / 2) / 5) * 5;
+  for (let a = start; a <= az + span / 2; a += 5) {
+    const x = r.width / 2 + norm180(a - az) * ppd;
+    const A = norm360(a);
+    const major = A % 30 === 0;
+    g.strokeStyle = major ? txt : dim; g.globalAlpha = major ? .9 : .45;
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, r.height - 9); g.lineTo(x, r.height - (major ? 20 : 14)); g.stroke();
+    if (major && Math.abs(x - r.width / 2) > cw / 2 + 14) {
+      g.globalAlpha = 1; g.fillStyle = A % 90 === 0 ? acc : txt;
+      const lbl = A % 90 === 0 ? NBK.azName(A) : String(A).padStart(3, '0');
+      g.fillText(lbl, x, r.height - 24);
+    }
+  }
+  g.globalAlpha = 1;
+  g.font = '600 12px ui-monospace,monospace';
+  g.fillStyle = 'rgba(6,12,9,.7)';
+  g.fillRect(r.width / 2 - cw / 2, r.height - 34, cw, 16);
+  g.fillStyle = acc; g.textAlign = 'center';
+  g.fillText(center, r.width / 2, r.height - 22);
+  // мітка цілі на лінійці
+  if (S.aim) {
+    const x = r.width / 2 + norm180(S.aim.az - az) * ppd;
+    if (x > 0 && x < r.width) {
+      g.fillStyle = acc; g.beginPath();
+      g.moveTo(x, r.height - 6); g.lineTo(x - 4, r.height); g.lineTo(x + 4, r.height); g.fill();
+    }
+  }
+}
+
+/* ---------- мінікарта ---------- */
+function drawMini(canvas) {
+  const c = canvas || $('#mini');
+  const r = c.getBoundingClientRect();
+  if (!r.width) return;
+  const d = sizeCanvas(c, r.width, r.height);
+  const g = c.getContext('2d');
+  g.setTransform(d, 0, 0, d, 0, 0);
+  const W = r.width, H = r.height, cx = W / 2, cy = H / 2;
+  g.clearRect(0, 0, W, H);
+  const acc = cssVar('--acc', '#3ddc84'), line = cssVar('--line2', '#2a4635'),
+    dim = cssVar('--dim', '#5e7568'), warn = cssVar('--warn', '#f5b83d');
+
+  const rng = S.track.init ? Math.max(1000, NBK.hyp(S.track.p[0], S.track.p[1]) * 1.5) : 5000;
+  const step = rng > 15000 ? 5000 : rng > 6000 ? 2000 : rng > 2500 ? 1000 : 500;
+  const ppm = (Math.min(W, H) / 2 - 12) / rng;
+
+  g.strokeStyle = line; g.lineWidth = 1; g.font = '9px ui-monospace,monospace'; g.fillStyle = dim;
+  for (let d0 = step; d0 <= rng; d0 += step) {
+    g.globalAlpha = .5; g.beginPath(); g.arc(cx, cy, d0 * ppm, 0, 7); g.stroke();
+    g.globalAlpha = .8; g.fillText((d0 / 1000).toFixed(d0 < 1000 ? 1 : 0) + 'к', cx + 3, cy - d0 * ppm + 10);
+  }
+  g.globalAlpha = .45;
+  g.beginPath(); g.moveTo(cx, 6); g.lineTo(cx, H - 6); g.moveTo(6, cy); g.lineTo(W - 6, cy); g.stroke();
+  g.globalAlpha = 1; g.fillStyle = dim; g.textAlign = 'center';
+  g.fillText('Пн', cx, 12); g.textAlign = 'left';
+
+  // власна точка
+  g.fillStyle = acc; g.beginPath(); g.arc(cx, cy, 3.5, 0, 7); g.fill();
+
+  // сектор погляду
+  const fov = NBK.fovFromF(S.cam.w || 1280, S.fpx || 1000);
+  g.fillStyle = acc; g.globalAlpha = .1;
+  g.beginPath(); g.moveTo(cx, cy);
+  g.arc(cx, cy, Math.min(W, H) / 2 - 12, (S.head.az - fov / 2 - 90) * NBK.D2R, (S.head.az + fov / 2 - 90) * NBK.D2R);
+  g.closePath(); g.fill(); g.globalAlpha = 1;
+
+  if (!S.track.init) {
+    g.fillStyle = dim; g.textAlign = 'center'; g.font = '10px sans-serif';
+    g.fillText('цілі немає', cx, H - 10); g.textAlign = 'left';
+    return;
+  }
+  const px = e => cx + e * ppm, py = n => cy - n * ppm;
+
+  // слід
+  g.strokeStyle = acc; g.globalAlpha = .35; g.lineWidth = 1.2; g.beginPath();
+  const h = S.track.hist;
+  for (let i = Math.max(0, h.length - 240); i < h.length; i++) {
+    const p = h[i].p; const X = px(p[0]), Y = py(p[1]);
+    i === Math.max(0, h.length - 240) ? g.moveTo(X, Y) : g.lineTo(X, Y);
+  }
+  g.stroke(); g.globalAlpha = 1;
+
+  // пеленг
+  g.strokeStyle = acc; g.globalAlpha = .5; g.setLineDash([3, 4]);
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(px(S.track.p[0]), py(S.track.p[1])); g.stroke();
+  g.setLineDash([]); g.globalAlpha = 1;
+
+  // екстраполяція
+  if (S.set.extrapolate && S.der && S.der.speed > 3) {
+    g.strokeStyle = warn; g.setLineDash([5, 5]); g.globalAlpha = .8;
+    g.beginPath(); g.moveTo(px(S.track.p[0]), py(S.track.p[1]));
+    g.lineTo(px(S.track.p[0] + S.track.v[0] * 60), py(S.track.p[1] + S.track.v[1] * 60));
+    g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+  }
+
+  // коридор похибки
+  if (S.est) {
+    g.strokeStyle = acc; g.globalAlpha = .25;
+    g.beginPath(); g.arc(px(S.track.p[0]), py(S.track.p[1]), Math.max(3, S.est.sigma * ppm), 0, 7); g.stroke();
+    g.globalAlpha = 1;
+  }
+  // ціль
+  const tx = px(S.track.p[0]), ty = py(S.track.p[1]);
+  g.fillStyle = acc; g.save(); g.translate(tx, ty);
+  if (S.der) g.rotate(S.der.heading * NBK.D2R);
+  g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(0, 3); g.lineTo(-5, 6); g.closePath(); g.fill();
+  g.restore();
+}
+
+/* ---------- спектр ---------- */
+function drawSpec(canvas) {
+  const c = canvas; if (!c) return;
+  const r = c.getBoundingClientRect(); if (!r.width) return;
+  const d = sizeCanvas(c, r.width, r.height);
+  const g = c.getContext('2d');
+  g.setTransform(d, 0, 0, d, 0, 0);
+  const W = r.width, H = r.height;
+  g.clearRect(0, 0, W, H);
+  const acc = cssVar('--acc', '#3ddc84'), dim = cssVar('--dim', '#5e7568'), warn = cssVar('--warn', '#f5b83d');
+  if (!S.audio.ok) {
+    g.fillStyle = dim; g.font = '11px sans-serif'; g.textAlign = 'center';
+    g.fillText('мікрофон не підключено', W / 2, H / 2); g.textAlign = 'left'; return;
+  }
+  const a = S.audio, maxHz = 500, hpb = a.hzPerBin || 1;
+  const bins = Math.min(a.data.length, Math.floor(maxHz / hpb));
+  // смуга інтересу 80–130 Гц
+  const x1 = W * 80 / maxHz, x2 = W * 130 / maxHz;
+  g.fillStyle = warn; g.globalAlpha = .12; g.fillRect(x1, 0, x2 - x1, H); g.globalAlpha = 1;
+  g.fillStyle = acc;
+  for (let i = 1; i < bins; i++) {
+    const x = (i / bins) * W, h = (a.data[i] / 255) * (H - 14);
+    g.globalAlpha = .35 + (a.data[i] / 255) * .65;
+    g.fillRect(x, H - h - 12, Math.max(1, W / bins - .5), h);
+  }
+  g.globalAlpha = 1; g.fillStyle = dim; g.font = '9px ui-monospace,monospace';
+  for (const hz of [100, 200, 300, 400]) {
+    const x = W * hz / maxHz;
+    g.fillText(hz, x + 2, H - 2);
+  }
+  if (a.peak > 0 && a.peakLvl > 60) {
+    const x = W * a.peak / maxHz;
+    g.strokeStyle = warn; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H - 12); g.stroke();
+    g.fillStyle = warn; g.fillText(a.peak.toFixed(0) + ' Гц', x + 3, 10);
+  }
+}
+/* ── 80_ui.js ── */
+/* ============================================================
+   Інтерфейс: жести, шторка, панелі, головний цикл
+   ============================================================ */
+
+/* ---------- шторка ---------- */
+function openSheet(tab) {
+  $('#sheet').classList.add('open');
+  if (tab) selectTab(tab);
+  refreshAllPanels();
+}
+function closeSheet() { $('#sheet').classList.remove('open'); }
+function toggleSheet() { $('#sheet').classList.contains('open') ? closeSheet() : openSheet(); }
+function selectTab(id) {
+  $$('.tab').forEach(t => {
+    const on = t.dataset.p === id;
+    t.classList.toggle('on', on);
+    if (on && t.scrollIntoView) t.scrollIntoView({ inline: 'center', block: 'nearest' });
+  });
+  $$('.page').forEach(p => p.classList.toggle('on', p.id === id));
+  refreshAllPanels();
+}
+
+/* ---------- жести на кадрі ---------- */
+let tapT = 0, tapXY = null, pressT = 0, pinch = null;
+function bindGestures() {
+  const ov = $('#ov');
+  ov.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch' && e.isPrimary === false) return;
+    tapXY = { x: e.clientX, y: e.clientY, t: now() };
+    pressT = setTimeout(() => {
+      if (S.tgt) { unlock(); toast('супровід скинуто'); }
+      tapXY = null;
+    }, 620);
+  });
+  ov.addEventListener('pointermove', e => {
+    if (tapXY && Math.hypot(e.clientX - tapXY.x, e.clientY - tapXY.y) > 14) {
+      clearTimeout(pressT); tapXY = null;
+    }
+  });
+  ov.addEventListener('pointerup', e => {
+    clearTimeout(pressT);
+    if (!tapXY) return;
+    const dt = now() - tapT;
+    tapT = now();
+    if (dt < 300) { if (S.tgt) unlock(); tapXY = null; return; }   // подвійний тап — скидання
+    const r = ov.getBoundingClientRect();
+    handleTap(e.clientX - r.left, e.clientY - r.top);
+    tapXY = null;
+  });
+  ov.addEventListener('pointercancel', () => { clearTimeout(pressT); tapXY = null; });
+
+  // пінч-зум камери
+  ov.addEventListener('touchstart', e => {
+    if (e.touches.length === 2 && S.cam.zoomCaps) {
+      pinch = { d: touchDist(e), z: S.cam.zoom };
+    }
+  }, { passive: true });
+  ov.addEventListener('touchmove', e => {
+    if (pinch && e.touches.length === 2) {
+      const k = touchDist(e) / pinch.d;
+      setZoom(pinch.z * k);
+    }
+  }, { passive: true });
+  ov.addEventListener('touchend', () => { pinch = null; }, { passive: true });
+
+  // свайп угору знизу екрана відкриває шторку
+  let swipe = null;
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    if (t && t.clientY > innerHeight - 90) swipe = { y: t.clientY, x: t.clientX };
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!swipe) return;
+    const t = e.changedTouches[0];
+    if (t && swipe.y - t.clientY > 60 && Math.abs(t.clientX - swipe.x) < 70) openSheet();
+    swipe = null;
+  }, { passive: true });
+}
+const touchDist = e => Math.hypot(
+  e.touches[0].clientX - e.touches[1].clientX,
+  e.touches[0].clientY - e.touches[1].clientY);
+
+function handleTap(sx, sy) {
+  // спершу — найближчий кандидат
+  let best = null, bd = 70;
+  if (S.auto) for (const c of S.cands) {
+    const p = v2s(c.x, c.y);
+    const d = Math.hypot(p.x - sx, p.y - sy);
+    if (d < bd) { bd = d; best = c; }
+  }
+  const v = best ? { x: best.x, y: best.y } : s2v(sx, sy);
+  if (v.x < 4 || v.y < 4 || v.x > S.cam.w - 4 || v.y > S.cam.h - 4) return;
+  lockAt(v.x, v.y, best ? Math.max(best.w, best.h) : 0);
+}
+
+function updateHint() {
+  const h = $('#hint');
+  let msg = '';
+  if (!S.tgt) msg = S.auto ? 'Тапни по підсвіченому кандидату або будь-де по цілі' : 'Тапни по цілі, щоб узяти на супровід';
+  else if (!myPos()) msg = 'Ціль веду, але без своєї точки координат не буде';
+  else if (S.fovSrc === 'default' && S.set.methods.size) msg = 'Відкалібруй FOV — інакше дальність за розміром бреше';
+  else if (S.tgt.lost > 5) msg = 'Тримається слабко — підведи ціль ближче до центра';
+  else msg = 'Подвійний тап — скинути';
+  h.textContent = msg;
+  h.classList.remove('gone');
+  clearTimeout(updateHint._t);
+  updateHint._t = setTimeout(() => h.classList.add('gone'), 5200);
+}
+
+/* ---------- зчитування ---------- */
+const M_SHORT = { size: 'розм', alt: 'вис', acoustic: 'звук', triang: 'трг' };
+const methodsShort = u => (u || []).map(m => M_SHORT[m] || m).join('+');
+function setRead(id, val, sub, grade) {
+  const el = $(id);
+  el.querySelector('.v').innerHTML = val;
+  el.querySelector('.s').textContent = sub || '';
+  el.className = 'rd' + (grade ? ' ' + grade : (val === '—' ? ' empty' : ''));
+}
+function updateReadouts() {
+  if (!S.tgt || !S.est) {
+    setRead('#r-dist', '—', 'ціль не захоплена');
+    setRead('#r-spd', '—', '');
+    setRead('#r-hdg', '—', '');
+    setRead('#r-alt', '—', '');
+    return;
+  }
+  const p = NBK.fmtPM(S.est.r, S.est.sigma);
+  setRead('#r-dist', p.value, '±' + p.pm.replace(' м', '').replace(' км', 'к') + ' · ' + methodsShort(S.est.used), p.grade);
+  const d = S.der || {};
+  const moving = d.speed > 2;
+  setRead('#r-spd', moving ? fmtSpeed(d.speed) + ' <span class="u">' + spdUnitLabel() + '</span>' : '—',
+    moving ? (d.closing > 1 ? '↓' + d.closing.toFixed(0) + ' м/с на нас'
+      : d.closing < -1 ? '↑' + (-d.closing).toFixed(0) + ' м/с відхід' : 'траверз') : 'накопичую трек');
+  setRead('#r-hdg', moving ? NBK.fmtAz(d.heading) : '—',
+    moving ? 'на ' + NBK.azName(d.heading) + (d.tcpa ? ' · CPA ' + Math.round(d.tcpa) + ' с' : '') : '');
+  setRead('#r-alt', d.alt ? Math.round(d.alt) + ' <span class="u">м</span>' : '—',
+    d.vertical > 1 ? '↗ ' + d.vertical.toFixed(0) + ' м/с'
+      : d.vertical < -1 ? '↘ ' + (-d.vertical).toFixed(0) + ' м/с' : 'горизонт');
+}
+
+function updateChips() {
+  const me = myPos();
+  const gps = $('#c-gps');
+  if (!me) { gps.dataset.s = 'bad'; gps.querySelector('span').textContent = 'GPS —'; }
+  else if (me.manual) { gps.dataset.s = 'mid'; gps.querySelector('span').textContent = 'ТОЧКА ВРУЧНУ'; }
+  else {
+    gps.dataset.s = S.me.acc < 20 ? 'ok' : S.me.acc < 60 ? 'mid' : 'bad';
+    gps.querySelector('span').textContent = 'GPS ±' + Math.round(S.me.acc || 0) + 'м';
+  }
+  const cp = $('#c-comp');
+  cp.dataset.s = S.head.quality >= 3 ? 'ok' : S.head.quality === 2 ? 'mid' : 'bad';
+  cp.querySelector('span').textContent = 'АЗ ±' + azErrDeg().toFixed(0) + '°';
+  const cl = $('#c-cal');
+  cl.dataset.s = (S.fovSrc === 'gyro' || S.fovSrc === 'диск') ? 'ok' : S.fovSrc === 'default' ? 'bad' : 'mid';
+  cl.querySelector('span').textContent = 'FOV ' + NBK.fovFromF(S.cam.w || 1280, S.fpx || 1000).toFixed(0) + '°';
+}
+
+/* ---------- бічна панель ---------- */
+function refreshSide() {
+  if (!document.body.classList.contains('analytic')) return;
+  const d = S.der;
+  const me = myPos();
+  const kin = [];
+  if (d && S.tgt && S.aim) {
+    kin.push(['Похила дальність', NBK.fmtDist(d.slant)]);
+    kin.push(['Горизонтальна', NBK.fmtDist(d.ground)]);
+    kin.push(['Висота', Math.round(d.alt) + ' м']);
+    kin.push(['Азимут / кут місця', NBK.fmtAz(S.aim.az) + ' / ' + S.aim.el.toFixed(1) + '°']);
+    kin.push(['Шляхова', fmtSpeed(d.speed) + ' ' + spdUnitLabel()]);
+    kin.push(['Вертикальна', d.vertical.toFixed(1) + ' м/с']);
+    kin.push(['Курс', NBK.fmtAz(d.heading) + ' (' + NBK.azName(d.heading) + ')']);
+    kin.push(['Зближення', d.closing.toFixed(1) + ' м/с']);
+    if (d.tcpa) kin.push(['CPA', Math.round(d.dcpa) + ' м через ' + Math.round(d.tcpa) + ' с']);
+    if (S.tgtPos) kin.push(['Точка цілі', fmtCoord(S.tgtPos.lat, S.tgtPos.lon)]);
+    if (me) kin.push(['Моя точка', fmtCoord(me.lat, me.lon)]);
+  }
+  $('#sideKin').innerHTML = kin.length
+    ? kin.map(k => `<div class="kv"><span>${k[0]}</span><span>${k[1]}</span></div>`).join('')
+    : '<div class="note">Цілі немає.</div>';
+
+  $('#sideRange').innerHTML = S.ranges.length
+    ? S.ranges.map(r => r.skip
+      ? `<div class="kv"><span>${r.label}</span><span style="color:var(--dim)">${r.why}</span></div>`
+      : `<div class="kv"><span>${r.label}</span><span>${NBK.fmtDist(r.r)} ±${NBK.fmtDist(r.sigma)}</span></div>`).join('')
+    + (S.est ? `<div class="kv"><span><b>Зважена</b></span><span style="color:var(--acc)">${NBK.fmtDist(S.est.r)} ±${NBK.fmtDist(S.est.sigma)}</span></div>` : '')
+    : '<div class="note">—</div>';
+
+  const g = (S.der && S.tgt) ? NBK.classify(S.der.speedKmh, S.der.alt) : [];
+  $('#sideGuess').innerHTML = g.length
+    ? g.map(x => `<div class="kv"><span>${x.name}</span><span>${'●'.repeat(x.score)}</span></div>`).join('')
+    + '<div class="note">Підказка за швидкістю й висотою, не розпізнавання.</div>'
+    : '—';
+  drawMini($('#mini'));
+  drawSpec($('#spec2'));
+}
+
+/* ---------- вкладки ---------- */
+function refreshAllPanels() {
+  if (!$('#sheet').classList.contains('open')) return;
+  const on = id => $('#' + id) && $('#' + id).classList.contains('on');
+  if (on('t-target')) refreshTargetTab();
+  if (on('t-calib')) refreshCalibTab();
+  if (on('t-sound')) refreshSoundTab();
+  if (on('t-set')) refreshSetTab();
+}
+function refreshTargetTab() {
+  const cat = NBK.catalogById(S.set.typeId);
+  $('#alt-range').textContent = cat.alt[0] + '–' + cat.alt[1] + ' м';
+  $('#type-note').innerHTML = 'Габарит: <b>' + cat.dim + '</b>' + (cat.note ? ' · ' + cat.note : '');
+  const box = $('#est-card');
+  if (!S.tgt || !S.est) { box.innerHTML = '<div class="note">Цілі на супроводі немає.</div>'; return; }
+  const rows = S.ranges.map(r => r.skip
+    ? `<div class="kv"><span>${r.label}</span><span style="color:var(--dim)">${r.why}</span></div>`
+    : `<div class="kv"><span>${r.label}<br><small style="color:var(--dim)">${r.detail || ''}</small></span><span>${NBK.fmtDist(r.r)} ±${NBK.fmtDist(r.sigma)}</span></div>`).join('');
+  const cons = S.est.consistency;
+  box.innerHTML = rows +
+    `<div class="kv"><span><b>Підсумок</b></span><span style="color:var(--acc)">${NBK.fmtDist(S.est.r)} ±${NBK.fmtDist(S.est.sigma)}</span></div>` +
+    (S.tgtPos ? `<div class="kv"><span>Координати цілі</span><span>${fmtCoord(S.tgtPos.lat, S.tgtPos.lon)}</span></div>
+      <button class="btn sm" style="margin-top:8px" id="copy-tgt">Копіювати координати</button>` : '') +
+    (cons > 3 ? '<div class="note"><b>Методи суперечать один одному</b> — коридор роздуто. Перевір тип цілі й висоту.</div>' : '');
+  const b = $('#copy-tgt');
+  if (b) b.onclick = () => copyText(fmtCoord(S.tgtPos.lat, S.tgtPos.lon) + ' | ' + NBK.fmtDist(S.est.r) + ' ±' + NBK.fmtDist(S.est.sigma) + ' | ' + NBK.catalogById(S.set.typeId).name);
+}
+function refreshCalibTab() {
+  const w = S.cam.w || 1280;
+  $('#k-fpx').textContent = Math.round(S.fpx) + ' px';
+  $('#k-fov').textContent = NBK.fovFromF(w, S.fpx).toFixed(1) + '°';
+  $('#k-zoom').textContent = S.cam.zoom.toFixed(1) + '×';
+  const names = { gyro: 'по гіроскопу', 'диск': 'по диску', api: 'з API камери', scaled: 'масштабовано', default: 'типове, не калібровано' };
+  $('#k-src').textContent = names[S.fovSrc] || S.fovSrc;
+  $('#k-magaz').textContent = NBK.fmtAz(S.head.magAz || 0);
+  $('#k-decl').textContent = S.decl == null ? 'невідоме' : (S.decl > 0 ? '+' : '') + S.decl.toFixed(1) + '°';
+  $('#k-off').textContent = (S.set.azOffset > 0 ? '+' : '') + S.set.azOffset.toFixed(1) + '°';
+  $('#k-trueaz').textContent = NBK.fmtAz(S.head.az);
+  const rf = $('#rg-fov'); if (document.activeElement !== rf) rf.value = NBK.fovFromF(w, S.fpx).toFixed(1);
+  const ro = $('#rg-off'); if (document.activeElement !== ro) ro.value = S.set.azOffset;
+}
+function refreshSoundTab() {
+  $('#k-peak').textContent = S.audio.ok && S.audio.peakLvl > 50 ? S.audio.peak.toFixed(0) + ' Гц' : '—';
+  $('#k-lvl').textContent = S.audio.ok ? Math.round(S.audio.level) + '/255' : 'мікрофон вимкнено';
+  $('#k-dt').textContent = S.audio.dt ? S.audio.dt.toFixed(2) + ' с' : '—';
+  const r = S.audio.dt ? NBK.rangeByAcoustic(S.audio.dt, S.set.temp) : null;
+  $('#k-adist').textContent = r ? NBK.fmtDist(r.r) + ' ±' + NBK.fmtDist(r.sigma) : '—';
+  drawSpec($('#spec'));
+}
+function refreshSetTab() {
+  const me = myPos();
+  $('#k-me').textContent = me ? me.lat.toFixed(5) + ', ' + me.lon.toFixed(5) : '—';
+  $('#k-me-mgrs').textContent = me ? (NBK.toMGRS(me.lat, me.lon, 5) || '—') : '—';
+  $('#k-acc').textContent = S.me.acc ? '±' + Math.round(S.me.acc) + ' м' : '—';
+}
+function renderLog() {
+  $('#log-count').textContent = S.log.length ? '· ' + S.log.length : '';
+  const box = $('#log-list');
+  if (!S.log.length) { box.innerHTML = '<div class="note">Журнал порожній. Кнопка «ФІКС» на головному екрані записує поточний стан цілі.</div>'; return; }
+  box.innerHTML = S.log.slice().reverse().slice(0, 60).map(r => `
+    <div class="logrow">
+      <div class="t">${hhmmss(new Date(r.t))}</div>
+      <div class="m"><b>${esc(r.typeName)}</b>
+        <small>${NBK.fmtDist(r.range)} ±${NBK.fmtDist(r.sigma)} · ${NBK.fmtAz(r.az)} · ${(r.speed * 3.6).toFixed(0)} км/год · ${r.pos ? esc(fmtCoord(r.pos.lat, r.pos.lon)) : 'без координат'}</small>
+      </div>
+    </div>`).join('');
+}
+
+/* ---------- перемикачі методів ---------- */
+function syncMethodSwitches() {
+  $$('#method-rows .sw').forEach(sw => sw.classList.toggle('on', !!S.set.methods[sw.dataset.m]));
+}
+
+/* ---------- скріншот і запис ---------- */
+function composite(targetW) {
+  const v = $('#vid'), ov = $('#ov');
+  const cw = S.view.cw || innerWidth, ch = S.view.ch || innerHeight;
+  const W = Math.min(targetW || 1080, Math.round(cw * 2));
+  const H = Math.round(W * ch / cw);
+  const c = composite._c || (composite._c = document.createElement('canvas'));
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  const k = W / cw;
+  g.drawImage(v, S.view.ox * k, S.view.oy * k, S.cam.w * S.view.scale * k, S.cam.h * S.view.scale * k);
+  g.drawImage(ov, 0, 0, W, H);
+  // штамп
+  const me = myPos();
+  g.font = Math.round(W / 62) + 'px ui-monospace,monospace';
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, H - W / 15, W, W / 15);
+  g.fillStyle = cssVar('--acc', '#3ddc84');
+  const line = [new Date().toLocaleString('uk-UA'),
+  me ? fmtCoord(me.lat, me.lon) : 'без координат',
+  'АЗ ' + NBK.fmtAz(S.aim ? S.aim.az : S.head.az),
+  S.est ? NBK.fmtDist(S.est.r) + '±' + NBK.fmtDist(S.est.sigma) : ''].filter(Boolean).join('  ·  ');
+  g.fillText(line, W / 90, H - W / 46);
+  return c;
+}
+function shot() {
+  const c = composite(1440);
+  c.toBlob(b => {
+    if (!b) { toast('не вийшов кадр', 'bad'); return; }
+    download('neboskop_' + stamp() + '.png', b, 'image/png');
+    toast('кадр збережено', 'good'); vibro(15);
+  }, 'image/png');
+}
+function pickMime() {
+  const list = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  for (const m of list) if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+function toggleRec() {
+  if (S.rec) { stopRec(); return; }
+  if (!window.MediaRecorder) { toast('запис відео тут не підтримується', 'bad'); return; }
+  const cw = S.view.cw || innerWidth, ch = S.view.ch || innerHeight;
+  const W = 720, H = Math.round(720 * ch / cw / 2) * 2;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const draw = () => {
+    const src = composite(W);
+    g.drawImage(src, 0, 0, W, H);
+  };
+  const timer = setInterval(draw, 1000 / 20);
+  const mime = pickMime();
+  let mr;
+  try { mr = new MediaRecorder(c.captureStream(20), mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : undefined); }
+  catch (e) { clearInterval(timer); toast('запис не запустився', 'bad'); return; }
+  const chunks = [];
+  mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mr.onstop = () => {
+    clearInterval(timer);
+    const blob = new Blob(chunks, { type: mime || 'video/webm' });
+    const ext = (mime || '').indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+    download('neboskop_' + stamp() + '.' + ext, blob);
+    toast('кліп збережено', 'good');
+  };
+  mr.start(1000);
+  S.rec = { mr, timer, t0: Date.now() };
+  $('#a-rec').classList.add('on', 'rec');
+  vibro([20, 60, 20]); toast('пишу', 'warn');
+  S.recCap = setTimeout(stopRec, 120000);
+}
+function stopRec() {
+  if (!S.rec) return;
+  clearTimeout(S.recCap);
+  try { S.rec.mr.stop(); } catch (e) { }
+  S.rec = null;
+  $('#a-rec').classList.remove('on', 'rec');
+  vibro(30);
+}
+
+/* ---------- прив'язка контролів ---------- */
+function bindSwitch(sel, key, after) {
+  const el = $(sel); if (!el) return;
+  el.classList.toggle('on', !!S.set[key]);
+  el.addEventListener('click', () => {
+    S.set[key] = !S.set[key];
+    el.classList.toggle('on', S.set[key]);
+    saveSet(); vibro(8);
+    if (after) after(S.set[key]);
+  });
+}
+function bindRange(sel, key, disp, after) {
+  const el = $(sel); if (!el) return;
+  el.value = S.set[key];
+  const h = () => {
+    S.set[key] = parseFloat(el.value);
+    if (disp) $(disp).textContent = el.value;
+    saveSet(); if (after) after(S.set[key]);
+  };
+  el.addEventListener('input', h);
+}
+
+function bindUI() {
+  /* чипи */
+  $('#c-mode').onclick = () => { $('#sw-analytic').click(); };
+  $('#c-night').onclick = () => { $('#sw-night').click(); };
+
+  /* кнопки дій */
+  $('#a-lock').onclick = () => {
+    if (S.tgt) { unlock(); return; }
+    if (S.cands.length) { const c = S.cands[0]; lockAt(c.x, c.y, Math.max(c.w, c.h)); }
+    else lockAt(S.cam.w / 2, S.cam.h / 2, 0);
+  };
+  $('#a-auto').onclick = () => {
+    S.auto = !S.auto;
+    $('#a-auto').classList.toggle('on', S.auto);
+    if (S.auto && !DET.ready) detInit();
+    toast(S.auto ? 'автопошук по небу увімкнено' : 'автопошук вимкнено');
+    updateHint(); vibro(10);
+  };
+  $('#a-fix').onclick = addFix;
+  $('#a-shot').onclick = shot;
+  $('#a-rec').onclick = toggleRec;
+  $('#a-menu').onclick = toggleSheet;
+
+  /* шторка */
+  $('#tabs').addEventListener('click', e => {
+    const t = e.target.closest('.tab'); if (t) { selectTab(t.dataset.p); vibro(6); }
+  });
+  let gy = null;
+  $('#grip').addEventListener('pointerdown', e => { gy = e.clientY; $('#grip').setPointerCapture(e.pointerId); });
+  $('#grip').addEventListener('pointermove', e => {
+    if (gy == null) return;
+    const dy = e.clientY - gy;
+    if (dy > 0) $('#sheet').style.transform = 'translateY(' + dy + 'px)';
+  });
+  $('#grip').addEventListener('pointerup', e => {
+    if (gy == null) return;
+    const dy = e.clientY - gy; gy = null;
+    $('#sheet').style.transform = '';
+    if (dy > 80) closeSheet();
+  });
+
+  /* ціль */
+  const sel = $('#sel-type');
+  sel.innerHTML = NBK.CATALOG.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  sel.value = S.set.typeId;
+  sel.onchange = () => {
+    S.set.typeId = sel.value;
+    const c = NBK.catalogById(sel.value);
+    S.set.size = c.size;
+    S.set.tAlt = Math.round((c.alt[0] + c.alt[1]) / 2);
+    $('#in-size').value = S.set.size; $('#in-talt').value = S.set.tAlt; $('#rg-talt').value = S.set.tAlt;
+    saveSet(); refreshTargetTab();
+  };
+  $('#in-size').value = S.set.size;
+  $('#in-size').oninput = e => { const v = parseFloat(e.target.value); if (v > 0) { S.set.size = v; saveSet(); } };
+  $('#in-talt').value = S.set.tAlt; $('#rg-talt').value = S.set.tAlt;
+  $('#in-talt').oninput = e => { const v = parseFloat(e.target.value); if (v >= 0) { S.set.tAlt = v; $('#rg-talt').value = v; saveSet(); } };
+  $('#rg-talt').oninput = e => { S.set.tAlt = +e.target.value; $('#in-talt').value = S.set.tAlt; saveSet(); };
+  $('#method-rows').addEventListener('click', e => {
+    const sw = e.target.closest('.sw'); if (!sw) return;
+    S.set.methods[sw.dataset.m] = !S.set.methods[sw.dataset.m];
+    sw.classList.toggle('on', S.set.methods[sw.dataset.m]);
+    saveSet(); vibro(8);
+  });
+  syncMethodSwitches();
+
+  /* калібровка */
+  $('#cal-gyro').onclick = () => calibOpen('gyro');
+  $('#cal-moon').onclick = () => calibOpen('moon');
+  $('#cvAct').onclick = calibAct;
+  $('#cvCancel').onclick = calibClose;
+  const cvc = $('#cvCanvas');
+  cvc.addEventListener('pointerdown', e => { calibPointer(e, 'down'); cvc.setPointerCapture(e.pointerId); });
+  cvc.addEventListener('pointermove', e => calibPointer(e, 'move'));
+  cvc.addEventListener('pointerup', e => calibPointer(e, 'up'));
+  $('#rg-fov').oninput = e => { setFov(parseFloat(e.target.value), 'вручну'); refreshCalibTab(); };
+  $('#rg-off').oninput = e => { S.set.azOffset = parseFloat(e.target.value); saveSet(); refreshCalibTab(); };
+  $('#cal-ref').onclick = openRefZero;
+  $('#cal-reset').onclick = () => { S.set.azOffset = 0; saveSet(); refreshCalibTab(); toast('поправку скинуто'); };
+  bindSwitch('#sw-gyrohold', 'gyroHold', () => { HOLD.az = null; });
+  if (S.cam.zoomCaps) {
+    const rz = $('#rg-zoom');
+    rz.min = S.cam.zoomCaps.min; rz.max = S.cam.zoomCaps.max;
+    rz.step = S.cam.zoomCaps.step; rz.value = S.cam.zoom;
+    rz.oninput = e => setZoom(parseFloat(e.target.value));
+    $('#zoom-note').textContent = 'Діапазон ' + S.cam.zoomCaps.min + '–' + S.cam.zoomCaps.max + '×. Кожен рівень зуму має власну калібровку FOV — після зміни зуму перекалібруй.';
+  }
+
+  /* звук */
+  $('#in-temp').value = S.set.temp;
+  $('#in-temp').oninput = e => { S.set.temp = parseFloat(e.target.value) || 0; saveSet(); refreshSoundTab(); };
+  $('#snd-see').onclick = () => { S.audio.seeT = Date.now(); S.audio.hearT = 0; vibro(12); beep(1200, 60); toast('момент проходу взято, тапни ЧУЮ коли дійде звук'); };
+  $('#snd-hear').onclick = () => {
+    if (!S.audio.seeT) { toast('спершу тапни БАЧУ', 'warn'); return; }
+    S.audio.hearT = Date.now();
+    S.audio.dt = (S.audio.hearT - S.audio.seeT) / 1000;
+    S.audio.dtAt = Date.now();
+    S.set.methods.acoustic = true; syncMethodSwitches(); saveSet();
+    vibro([10, 30, 10]); beep(700, 90);
+    refreshSoundTab();
+  };
+
+  /* тріангуляція */
+  const refreshMyFix = () => {
+    const s = myFixString();
+    $('#my-fix').textContent = s || 'нема власної точки';
+  };
+  $('#tri-refresh').onclick = () => { refreshMyFix(); vibro(8); };
+  $('#tri-copy').onclick = () => { const s = myFixString(); if (s) copyText(s); else toast(say('noPos'), 'bad'); };
+  $('#tri-apply').onclick = () => triApplyPeer($('#in-fix').value);
+  $('#tri-mark').onclick = triMarkSelf;
+  $('#tri-solve').onclick = triSolveSelf;
+  refreshMyFix();
+
+  /* журнал */
+  $$('[data-exp]').forEach(b => b.onclick = () => exportLog(b.dataset.exp));
+  $('#log-clear').onclick = () => {
+    openModal('<h3>Очистити журнал?</h3><p>Усі ' + S.log.length + ' записів буде видалено з цього браузера. Дію не відкотити.</p><div class="mrow"><button class="btn" id="m-yes">Так, чистимо</button><button class="btn ghost" id="m-no" style="max-width:110px">Ні</button></div>');
+    $('#m-no').onclick = closeModal;
+    $('#m-yes').onclick = () => { S.log = []; saveLog(); renderLog(); closeModal(); toast('журнал порожній'); };
+  };
+  renderLog();
+
+  /* налаштування */
+  $('#in-oalt').value = S.set.obsAlt == null ? '' : S.set.obsAlt;
+  $('#in-oalt').oninput = e => { const v = parseFloat(e.target.value); S.set.obsAlt = isFinite(v) ? v : null; saveSet(); };
+  bindSwitch('#sw-manual', 'manualPos', on => {
+    $('#manual-box').style.display = on ? 'grid' : 'none';
+    refreshSetTab(); updateChips();
+  });
+  $('#manual-box').style.display = S.set.manualPos ? 'grid' : 'none';
+  $('#in-lat').value = S.set.manLat == null ? '' : S.set.manLat;
+  $('#in-lon').value = S.set.manLon == null ? '' : S.set.manLon;
+  $('#in-lat').oninput = e => { S.set.manLat = parseFloat(e.target.value); saveSet(); refreshSetTab(); };
+  $('#in-lon').oninput = e => { S.set.manLon = parseFloat(e.target.value); saveSet(); refreshSetTab(); };
+  $('#sel-coord').value = S.set.coordFmt;
+  $('#sel-coord').onchange = e => { S.set.coordFmt = e.target.value; saveSet(); refreshSetTab(); renderLog(); };
+  $('#sel-spd').value = S.set.spdUnit;
+  $('#sel-spd').onchange = e => { S.set.spdUnit = e.target.value; saveSet(); };
+  bindSwitch('#sw-night', 'night', on => { document.documentElement.classList.toggle('night', on); });
+  bindSwitch('#sw-analytic', 'analytic', on => {
+    document.body.classList.toggle('analytic', on);
+    $('#c-mode').querySelector('span').textContent = on ? 'АНАЛ' : 'БОЙ';
+    updateView();
+  });
+  bindSwitch('#sw-extra', 'extrapolate');
+  bindSwitch('#sw-vibro', 'vibro');
+  bindSwitch('#sw-beep', 'beep');
+  bindSwitch('#sw-wake', 'wake', on => keepAwake(on));
+  bindSwitch('#sw-skyonly', 'skyOnly');
+  bindSwitch('#sw-onnx', 'onnx', on => {
+    if (on) {
+      S.set.onnx = false; $('#sw-onnx').classList.remove('on'); saveSet();
+      $('#onnx-note').innerHTML = '<b>Модель не підключено.</b> У цій збірці немає ваг: щоб не тягнути 10+ МБ у файл і не ходити в мережу, автопошук зроблено класичним CV. Слот під ONNX лишився — поклади <span class="mono">model.onnx</span> поруч з index.html і збірку можна розширити.';
+    } else $('#onnx-note').textContent = 'Вимкнено. Класичний детектор по небу працює без будь-яких файлів і не потребує мережі.';
+  });
+  bindRange('#rg-sens', 'sens');
+  bindRange('#rg-minpx', 'minpx');
+  bindRange('#rg-alpha', 'alpha', '#k-alpha', v => { S.track.alpha = v; });
+  bindRange('#rg-beta', 'beta', '#k-beta', v => { S.track.beta = v; });
+  $('#k-alpha').textContent = S.set.alpha; $('#k-beta').textContent = S.set.beta;
+  $('#btn-reset-all').onclick = () => {
+    openModal('<h3>Скинути все?</h3><p>Калібровка, поправки, налаштування і журнал буде видалено.</p><div class="mrow"><button class="btn" id="m-yes">Скидаємо</button><button class="btn ghost" id="m-no" style="max-width:110px">Ні</button></div>');
+    $('#m-no').onclick = closeModal;
+    $('#m-yes').onclick = () => { try { localStorage.removeItem('nbk.set.v1'); localStorage.removeItem('nbk.log.v1'); } catch (e) { } location.reload(); };
+  };
+  $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+  document.documentElement.classList.toggle('night', S.set.night);
+  document.body.classList.toggle('analytic', S.set.analytic);
+  $('#c-mode').querySelector('span').textContent = S.set.analytic ? 'АНАЛ' : 'БОЙ';
+}
+
+/* ---------- головний цикл ---------- */
+let tDet = 0, tSolve = 0, tSlow = 0, tRuler = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  if (!S.running) return;
+  const t = now();
+  fusedOrientation();
+
+  if (S.tgt) trackStep();
+  if (S.auto && t - tDet > 90) { tDet = t; S.cands = detectCandidates(); }
+  if (t - tSolve > 110) { tSolve = t; solveStep(); }
+
+  drawOverlay();
+  if (t - tRuler > 90) { tRuler = t; drawRuler(); }
+  if (t - tSlow > 380) {
+    tSlow = t;
+    pollAudio();
+    updateReadouts(); updateChips(); refreshSide();
+    if ($('#sheet').classList.contains('open')) refreshAllPanels();
+  }
+}
+
+/* ---------- старт ---------- */
+function setPerm(id, state, text) {
+  const el = $(id); el.dataset.s = state;
+  el.querySelector('.st').textContent = text;
+}
+async function boot(withMic) {
+  const b = $('#btn-start'); b.disabled = true;
+  b.innerHTML = '<svg><use href="#i-eye"/></svg>ЗАПУСКАЮ…';
+  let camOk = false;
+  try { setPerm('#p-cam', 'wait', 'питаю'); await startCamera(); setPerm('#p-cam', 'ok', 'працює'); camOk = true; }
+  catch (e) { setPerm('#p-cam', 'err', 'відмова'); toast(say('camErr'), 'bad', 4000); }
+
+  try { setPerm('#p-gyro', 'wait', 'питаю'); await startOrientation(); setPerm('#p-gyro', 'ok', 'працює'); }
+  catch (e) { setPerm('#p-gyro', 'err', 'нема'); toast(say('gyroErr'), 'bad', 4000); }
+
+  try { setPerm('#p-geo', 'wait', 'ловлю'); await startGeo(); setPerm('#p-geo', 'ok', '±' + Math.round(S.me.acc) + ' м'); }
+  catch (e) { setPerm('#p-geo', 'err', 'нема'); toast(say('geoErr'), 'warn', 4000); }
+
+  if (withMic) {
+    try { setPerm('#p-mic', 'wait', 'питаю'); await startMic(); setPerm('#p-mic', 'ok', 'слухає'); }
+    catch (e) { setPerm('#p-mic', 'err', 'нема'); }
+  } else setPerm('#p-mic', 'idle', 'пропущено');
+
+  if (!camOk) {
+    b.disabled = false; b.innerHTML = '<svg><use href="#i-eye"/></svg>СПРОБУВАТИ ЩЕ РАЗ';
+    return;
+  }
+  applyFovForZoom();
+  detInit();
+  $('#boot').classList.add('hide');
+  S.running = true;
+  if (S.set.wake) keepAwake(true);
+  updateView(); bindUI(); bindGestures(); updateHint();
+  toast(say('camOk'), 'good');
+  if (S.fovSrc === 'default') setTimeout(() => toast(say('needCal'), 'warn', 5000), 1600);
+}
+
+/* ---------- ініціалізація ---------- */
+loadSet();
+document.documentElement.classList.toggle('night', S.set.night);
+$('#btn-start').onclick = () => boot(true);
+$('#btn-skip-mic').onclick = () => boot(false);
+addEventListener('resize', () => { updateView(); });
+addEventListener('orientationchange', () => setTimeout(updateView, 350));
+if (screen.orientation && screen.orientation.addEventListener)
+  screen.orientation.addEventListener('change', () => setTimeout(updateView, 350));
+setInterval(() => { if (S.running) updateView(); }, 1500);
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+loop();
+</script>
+</body>
+</html>
